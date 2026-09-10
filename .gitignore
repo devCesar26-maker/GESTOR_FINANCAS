@@ -1,0 +1,24 @@
+# Python / Django
+FINANCAS/
+__pycache__/
+*.py[cod]
+backend/.env
+backend/db.sqlite3
+backend/staticfiles/
+backend/media/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+
+# Variáveis de ambiente
+.env
+.env.local
+
+# IDE / SO
+.vscode/
+.idea/
+.DS_Store

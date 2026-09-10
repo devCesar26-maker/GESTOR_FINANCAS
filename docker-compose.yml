@@ -1,0 +1,91 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: finflow
+      POSTGRES_USER: finflow
+      POSTGRES_PASSWORD: finflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finflow -d finflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    command: ./entrypoint.sh gunicorn finflow.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    environment:
+      SECRET_KEY: dev-secret-nao-para-producao
+      DEBUG: "true"
+      ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: finflow
+      DB_USER: finflow
+      DB_PASSWORD: finflow
+      DB_HOST: db
+      DB_PORT: "5432"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: ./backend
+    command: celery -A finflow worker -l info
+    environment:
+      SECRET_KEY: dev-secret-nao-para-producao
+      DEBUG: "true"
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: finflow
+      DB_USER: finflow
+      DB_PASSWORD: finflow
+      DB_HOST: db
+      DB_PORT: "5432"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_PROXY_TARGET: http://backend:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
