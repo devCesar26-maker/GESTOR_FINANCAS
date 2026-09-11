@@ -1,6 +1,7 @@
-from rest_framework.views import exception_handler
-from rest_framework.response import Response
+from django.db.models.deletion import ProtectedError
 from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import exception_handler
 
 
 class FaturaEstadoInvalidoError(Exception):
@@ -13,4 +14,9 @@ class FaturaEstadoInvalidoError(Exception):
 def custom_exception_handler(exc, context):
     if isinstance(exc, FaturaEstadoInvalidoError):
         return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+    if isinstance(exc, ProtectedError):
+        return Response(
+            {"detail": "Não é possível excluir cliente com faturas vinculadas."},
+            status=status.HTTP_409_CONFLICT,
+        )
     return exception_handler(exc, context)

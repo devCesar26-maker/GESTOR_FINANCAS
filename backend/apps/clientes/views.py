@@ -1,16 +1,10 @@
-"""
-Camada de views do app Clientes.
-
-ViewSet de CRUD com paginação (configuração global), filtros via
-django-filter e busca livre (SearchFilter). Apenas orquestração — nenhuma
-lógica de negócio deve morar aqui.
-"""
+"""Camada de views do app Clientes."""
 import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, viewsets
 
 from .models import Cliente
-from .serializers import ClienteSerializer
+from .serializers import ClienteDetailSerializer, ClienteListSerializer
 
 
 class ClienteFilter(django_filters.FilterSet):
@@ -28,7 +22,11 @@ class ClienteFilter(django_filters.FilterSet):
 
 class ClienteViewSet(viewsets.ModelViewSet):
     queryset = Cliente.objects.all()
-    serializer_class = ClienteSerializer
     filter_backends = (DjangoFilterBackend, filters.SearchFilter)
     filterset_class = ClienteFilter
     search_fields = ("nome", "documento", "email", "telefone")
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return ClienteListSerializer
+        return ClienteDetailSerializer

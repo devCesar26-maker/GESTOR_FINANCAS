@@ -1,9 +1,5 @@
-"""
-Camada de serializers do app Clientes.
-
-Validação de entrada e representação de saída da API: formato do documento
-(CPF para pessoa física, CNPJ para pessoa jurídica) e unicidade do documento.
-"""
+"""Camada de serializers do app Clientes."""
+import re
 from rest_framework import serializers
 
 from .models import Cliente, TipoPessoa
@@ -11,6 +7,8 @@ from .validators import validar_cnpj, validar_cpf
 
 
 class ClienteSerializer(serializers.ModelSerializer):
+    """Serializer completo utilizado para detalhes, criação e edição de cliente."""
+
     class Meta:
         model = Cliente
         fields = (
@@ -67,3 +65,25 @@ class ClienteSerializer(serializers.ModelSerializer):
                     }
                 )
         return attrs
+
+
+# Alias para detalhe
+ClienteDetailSerializer = ClienteSerializer
+
+
+class ClienteListSerializer(ClienteSerializer):
+    """Serializer para listagem com documento mascarado por razões de LGPD."""
+
+    documento = serializers.SerializerMethodField()
+
+    def get_documento(self, obj: Cliente) -> str | None:
+        if not obj.documento:
+            return None
+        doc = re.sub(r"\D", "", obj.documento)
+        if len(doc) == 11:
+            # CPF: 529.***.***-25
+            return f"{doc[:3]}.***.***-{doc[-2:]}"
+        elif len(doc) == 14:
+            # CNPJ: **.***.247/0001-**
+            return f"**.***.{doc[5:8]}/{doc[8:12]}-**"
+        return obj.documento

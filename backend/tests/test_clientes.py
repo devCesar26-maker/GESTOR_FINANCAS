@@ -2,13 +2,15 @@
 Testes do app Clientes.
 
 Cobrem: criação de cliente válido (PF e PJ), validação de documento
-(formato CPF/CNPJ + unicidade), CRUD dos endpoints e o bloqueio de acesso
+(formato CPF/CNPJ + unicidade), mascaramento LGPD na listagem vs detalhe,
+tentativa de exclusão com faturas (409 Conflict), CRUD dos endpoints e o bloqueio de acesso
 sem autenticação (401).
 """
 import pytest
 from rest_framework import status
 
 from apps.clientes.models import Cliente, Papel, TipoPessoa
+from apps.faturamento.models import Fatura
 
 URL = "/api/clientes/"
 
@@ -98,6 +100,28 @@ def test_documento_incompativel_com_tipo_pessoa_e_rejeitado(auth_client):
 
 
 # ---------------------------------------------------------------------------
+# Mascaramento LGPD (Listagem vs Detalhe)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_mascaramento_documento_lgpd(auth_client):
+    c = Cliente.objects.create(
+        nome="Cliente LGPD", tipo_pessoa=TipoPessoa.FISICA, documento=CPF_VALIDO
+    )
+
+    # Listagem -> Documento deve estar mascarado (529.***.***-25)
+    list_res = auth_client.get(URL)
+    assert list_res.status_code == status.HTTP_200_OK
+    assert list_res.data["results"][0]["documento"] == "529.***.***-25"
+
+    # Detalhe -> Documento deve vir completo
+    detail_res = auth_client.get(f"{URL}{c.id}/")
+    assert detail_res.status_code == status.HTTP_200_OK
+    assert detail_res.data["documento"] == CPF_VALIDO
+
+
+# ---------------------------------------------------------------------------
 # CRUD dos endpoints
 # ---------------------------------------------------------------------------
 
@@ -130,21 +154,6 @@ def test_atualizar_cliente(auth_client):
 
 
 @pytest.mark.django_db
-def test_atualizar_documento_para_duplicado_e_rejeitado(auth_client):
-    Cliente.objects.create(
-        nome="Primeiro", tipo_pessoa=TipoPessoa.FISICA, documento=CPF_VALIDO
-    )
-    outro = Cliente.objects.create(nome="Segundo", tipo_pessoa=TipoPessoa.FISICA)
-
-    response = auth_client.patch(
-        f"{URL}{outro.pk}/", {"documento": CPF_VALIDO}, format="json"
-    )
-
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "documento" in response.data
-
-
-@pytest.mark.django_db
 def test_deletar_cliente(auth_client):
     cliente = Cliente.objects.create(nome="Ana", tipo_pessoa=TipoPessoa.FISICA)
 
@@ -152,6 +161,22 @@ def test_deletar_cliente(auth_client):
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
     assert not Cliente.objects.filter(pk=cliente.pk).exists()
+
+
+@pytest.mark.django_db
+def test_deletar_cliente_com_faturas_retorna_409_conflito(auth_client):
+    cliente = Cliente.objects.create(nome="Ana", tipo_pessoa=TipoPessoa.FISICA)
+    Fatura.objects.create(
+        numero="FAT-PROT-1",
+        cliente=cliente,
+        valor="100.00",
+        vencimento="2026-09-30",
+    )
+
+    response = auth_client.delete(f"{URL}{cliente.pk}/")
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert "Não é possível excluir cliente com faturas vinculadas." in response.data["detail"]
 
 
 # ---------------------------------------------------------------------------

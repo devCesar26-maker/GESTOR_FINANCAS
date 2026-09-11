@@ -68,11 +68,14 @@ export default function Clientes() {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Tem certeza que deseja remover este cliente?')) return
+    setPageError('')
     try {
       await api.delete(`/clientes/${id}/`)
       fetchClientes()
     } catch (err) {
-      alert('Não foi possível remover o cliente.')
+      console.error(err)
+      const msg = err.response?.data?.detail || 'Não foi possível remover o cliente.'
+      setPageError(msg)
     }
   }
 
@@ -193,7 +196,7 @@ export default function Clientes() {
                 <input
                   type="text"
                   className="form-input"
-                  placeholder={formData.tipo_pessoa === 'pf' ? 'Ex: 12345678909' : 'Ex: 34.357.386/0001-05'}
+                  placeholder={formData.tipo_pessoa === 'pf' ? 'Ex: 123.456.789-09' : 'Ex: 34.357.386/0001-05'}
                   value={formData.documento}
                   onChange={(e) => setFormData({ ...formData, documento: e.target.value })}
                 />
