@@ -1,10 +1,14 @@
 """Camada de views do app Clientes."""
+import logging
+
 import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, viewsets
 
 from .models import Cliente
 from .serializers import ClienteDetailSerializer, ClienteListSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class ClienteFilter(django_filters.FilterSet):
@@ -35,7 +39,21 @@ class ClienteViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """Owner é sempre o usuário autenticado — nunca vem do payload."""
-        serializer.save(owner=self.request.user)
+        cliente = serializer.save(owner=self.request.user)
+
+        # Notificação de cadastro ao cliente/fornecedor: e-mail ÚNICO e
+        # informativo, independente de notificacoes_ativas (que controla
+        # apenas os lembretes recorrentes de vencimento). Assíncrono (Celery)
+        # e isolado — falha de broker/disparo NUNCA quebra a criação.
+        try:
+            from .tasks import task_enviar_email_cadastro_cliente
+
+            task_enviar_email_cadastro_cliente.delay(cliente.pk)
+        except Exception:
+            logger.exception(
+                "Falha ao disparar notificação de cadastro do cliente %s",
+                cliente.pk,
+            )
 
     def get_serializer_class(self):
         if self.action == "list":

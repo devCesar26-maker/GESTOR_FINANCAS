@@ -1,0 +1,17 @@
+Olá, {{ cliente_nome }}!
+
+{{ gestor }} cadastrou você como {{ papel_label|lower }} no sistema
+financeiro dele, na plataforma FinFlow.
+
+Isso permite que faturas e cobranças referentes a você sejam
+gerenciadas nessa plataforma de forma organizada.
+
+Esta é apenas uma notificação informativa, para transparência sobre
+o uso dos seus dados — NÃO é uma cobrança e não exige nenhuma ação
+sua neste momento.
+
+Se você não reconhece esse cadastro, entre em contato diretamente
+com {{ gestor }}.
+
+Atenciosamente,
+{{ gestor }} — via FinFlow

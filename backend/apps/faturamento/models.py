@@ -35,7 +35,10 @@ class Periodicidade(models.TextChoices):
 class Fatura(models.Model):
     """Conta a pagar ou a receber vinculada a um cliente/fornecedor."""
 
-    numero = models.CharField("número", max_length=20, unique=True)
+    # NOTA (multi-tenancy): o numero NÃO é único globalmente — dois gestores
+    # independentes podem ter faturas com o mesmo número (ex.: FAT-2026-001).
+    # A unicidade vale apenas DENTRO de cada owner (constraint composta no Meta).
+    numero = models.CharField("número", max_length=20)
     cliente = models.ForeignKey(
         "clientes.Cliente",
         on_delete=models.PROTECT,
@@ -90,6 +93,12 @@ class Fatura(models.Model):
             models.Index(fields=["status", "vencimento"], name="fat_status_venc_idx"),
         ]
         constraints = [
+            # Mesmo número só se repete entre owners diferentes, nunca duas
+            # vezes na carteira do mesmo gestor.
+            models.UniqueConstraint(
+                fields=["owner", "numero"],
+                name="uniq_fatura_owner_numero",
+            ),
             models.CheckConstraint(
                 condition=models.Q(valor__gte=0),
                 name="fatura_valor_positivo",

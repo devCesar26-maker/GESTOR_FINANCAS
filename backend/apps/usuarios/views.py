@@ -1,10 +1,13 @@
 """Views do app Usuarios."""
+import logging
 
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 
 from .serializers import RegistroResponseSerializer, RegistroSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class RegistroAPIView(generics.CreateAPIView):
@@ -32,6 +35,18 @@ class RegistroAPIView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+
+        # E-mail de boas-vindas: assíncrono (Celery) e isolado — uma falha
+        # de broker/disparo NUNCA quebra a criação da conta.
+        try:
+            from .tasks import task_enviar_email_boas_vindas
+
+            task_enviar_email_boas_vindas.delay(user.pk)
+        except Exception:
+            logger.exception(
+                "Falha ao disparar e-mail de boas-vindas do usuário %s", user.pk
+            )
+
         return Response(
             RegistroResponseSerializer(user).data
             | {"detail": "Conta criada com sucesso. Faça login para obter o token."},

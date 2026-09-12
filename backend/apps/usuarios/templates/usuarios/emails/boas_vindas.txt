@@ -1,0 +1,13 @@
+Olá, {{ nome }}!
+
+Sua conta no FinFlow foi criada com sucesso.
+
+  E-mail de acesso: {{ email }}
+
+Você já pode entrar na plataforma agora mesmo, com o e-mail e a senha
+que você cadastrou — não é necessário confirmar seu e-mail.
+
+Se não foi você quem criou esta conta, basta ignorar esta mensagem.
+
+Atenciosamente,
+Equipe FinFlow

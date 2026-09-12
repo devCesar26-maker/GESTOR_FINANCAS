@@ -17,3 +17,8 @@ DATABASES = {
 
 # Nunca envia e-mail de verdade nos testes; captura em django.core.mail.outbox.
 EMAIL_BACKEND = "anymail.backends.test.EmailBackend"
+
+# Tasks Celery rodam inline (eager): .delay() executa na hora, sem broker/worker,
+# permitindo assertar os e-mails enviados via fixture mailoutbox do pytest-django.
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = False

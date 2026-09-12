@@ -4,8 +4,9 @@ Testes de multi-tenancy (Fase 1).
 Cobrem: isolamento de listagem e detalhe entre usuários (404, não 403),
 para Cliente, Fatura e CobrancaRecorrente; ignorância de "owner" no payload;
 filtro de owner no relatório de fluxo de caixa; o endpoint público de
-registro (criação bem-sucedida e e-mail duplicado rejeitado); e unicidade
-de documento por owner (constraint composta owner + documento).
+registro (criação bem-sucedida e e-mail duplicado rejeitado); unicidade
+de documento por owner (constraint composta owner + documento); e unicidade
+do número de fatura por owner (mesmo padrão).
 """
 
 from decimal import Decimal
@@ -484,4 +485,89 @@ def test_constraint_owner_documento_no_banco(user_a, user_b):
     with pytest.raises(Exception):
         Cliente.objects.create(
             nome="A2", tipo_pessoa=TipoPessoa.FISICA, documento=CPF_A, owner=user_a
+        )
+
+
+# ---------------------------------------------------------------------------
+# Unicidade do número de fatura por owner (multi-tenancy)
+# ---------------------------------------------------------------------------
+
+
+def payload_fatura(cliente_id, **overrides):
+    payload = {
+        "numero": "FAT-2026-001",
+        "cliente": cliente_id,
+        "tipo": TipoFatura.A_RECEBER,
+        "valor": "100.00",
+        "vencimento": str(timezone.localdate()),
+    }
+    payload.update(overrides)
+    return payload
+
+
+@pytest.mark.django_db
+def test_mesmo_numero_de_fatura_pode_ser_usado_por_owners_diferentes(
+    client_a, client_b, cliente_a, cliente_b
+):
+    """Carteiras independentes: os dois gestores podem usar FAT-2026-001."""
+    resp_a = client_a.post(FATURAS_URL, payload_fatura(cliente_a.id), format="json")
+    resp_b = client_b.post(FATURAS_URL, payload_fatura(cliente_b.id), format="json")
+
+    assert resp_a.status_code == status.HTTP_201_CREATED
+    assert resp_b.status_code == status.HTTP_201_CREATED
+    assert Fatura.objects.filter(numero="FAT-2026-001").count() == 2
+
+
+@pytest.mark.django_db
+def test_numero_de_fatura_de_outro_owner_nao_bloqueia_cadastro(
+    client_a, client_b, cliente_a, cliente_b
+):
+    """Número já usado pelo owner B não impede o owner A de usá-lo."""
+    resp_b = client_b.post(
+        FATURAS_URL, payload_fatura(cliente_b.id, numero="FAT-2026-002"), format="json"
+    )
+    assert resp_b.status_code == status.HTTP_201_CREATED
+
+    resp_a = client_a.post(
+        FATURAS_URL, payload_fatura(cliente_a.id, numero="FAT-2026-002"), format="json"
+    )
+    assert resp_a.status_code == status.HTTP_201_CREATED
+
+
+@pytest.mark.django_db
+def test_mesmo_owner_nao_pode_repetir_numero_de_fatura(client_a, cliente_a):
+    first = client_a.post(FATURAS_URL, payload_fatura(cliente_a.id), format="json")
+    second = client_a.post(FATURAS_URL, payload_fatura(cliente_a.id), format="json")
+
+    assert first.status_code == status.HTTP_201_CREATED
+    assert second.status_code == status.HTTP_400_BAD_REQUEST
+    assert "numero" in second.data
+
+
+@pytest.mark.django_db
+def test_constraint_owner_numero_no_banco(user_a, user_b, cliente_a, cliente_b):
+    """A constraint composta (owner, numero) vale no nível do banco."""
+    Fatura.objects.create(
+        numero="FAT-SAME",
+        cliente=cliente_a,
+        valor=Decimal("10.00"),
+        vencimento=timezone.localdate(),
+        owner=user_a,
+    )
+    # Mesmo número, owner diferente: permitido.
+    Fatura.objects.create(
+        numero="FAT-SAME",
+        cliente=cliente_b,
+        valor=Decimal("10.00"),
+        vencimento=timezone.localdate(),
+        owner=user_b,
+    )
+    # Mesmo número, mesmo owner: viola a constraint composta.
+    with pytest.raises(Exception):
+        Fatura.objects.create(
+            numero="FAT-SAME",
+            cliente=cliente_a,
+            valor=Decimal("10.00"),
+            vencimento=timezone.localdate(),
+            owner=user_a,
         )
