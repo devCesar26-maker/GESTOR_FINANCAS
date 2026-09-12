@@ -354,14 +354,14 @@ def test_endpoint_fluxo_caixa_filtrado_por_usuario(
 def test_registro_bem_sucedido(api_client, django_user_model):
     response = api_client.post(
         REGISTRO_URL,
-        {"nome": "Novo Usuário", "email": "novo@finflow.com", "password": "senha-forte-456"},
+        {"nome": "Novo Usuário", "email": "novo@finflow.com", "password": "Senha-Forte-456!"},
         format="json",
     )
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["email"] == "novo@finflow.com"
 
     user = django_user_model.objects.get(email="novo@finflow.com")
-    assert user.check_password("senha-forte-456")
+    assert user.check_password("Senha-Forte-456!")
     assert user.is_active
 
 
@@ -372,7 +372,7 @@ def test_registro_rejeita_email_duplicado(api_client, django_user_model):
     )
     response = api_client.post(
         REGISTRO_URL,
-        {"nome": "Outro", "email": "DUP@finflow.com", "password": "outra-senha-789"},
+        {"nome": "Outro", "email": "DUP@finflow.com", "password": "Outra-Senha-789!"},
         format="json",
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -395,7 +395,7 @@ def test_registro_e_publico_sem_autenticacao(api_client):
     # Endpoint público: não retorna 401 como os demais.
     response = api_client.post(
         REGISTRO_URL,
-        {"nome": "Anon", "email": "anon@finflow.com", "password": "senha-anon-123"},
+        {"nome": "Anon", "email": "anon@finflow.com", "password": "Senha-Anon-123!"},
         format="json",
     )
     assert response.status_code == status.HTTP_201_CREATED

@@ -145,6 +145,10 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+    # Política própria do FinFlow: 8+ caracteres com maiúscula, minúscula,
+    # número e caractere especial. Valida apenas na CRIAÇÃO de conta — o
+    # login (JWT) nunca revalida força de senha.
+    {"NAME": "apps.usuarios.validators.SenhaForteValidator"},
 ]
 
 # ---------------------------------------------------------------------------
