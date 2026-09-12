@@ -4,9 +4,15 @@ from django.db.models import Sum
 from apps.faturamento.models import Fatura, StatusFatura, TipoFatura
 
 
-def gerar_fluxo_caixa(inicio=None, fim=None) -> dict:
-    """Calcula o resumo financeiro (entradas, saídas e saldos) para um período."""
+def gerar_fluxo_caixa(inicio=None, fim=None, owner=None) -> dict:
+    """Calcula o resumo financeiro (entradas, saídas e saldos) para um período.
+
+    Multi-tenancy: com owner informado, calcula apenas sobre as faturas do
+    usuário — nunca sobre todos os dados do banco.
+    """
     qs = Fatura.objects.exclude(status=StatusFatura.CANCELADA)
+    if owner is not None:
+        qs = qs.filter(owner=owner)
     if inicio:
         qs = qs.filter(vencimento__gte=inicio)
     if fim:

@@ -31,6 +31,7 @@ urlpatterns = [
         name="redoc",
     ),
     # Apps
+    path("api/", include("apps.usuarios.urls")),
     path("api/", include("apps.clientes.urls")),
     path("api/", include("apps.faturamento.urls")),
     path("api/relatorios/", include("apps.relatorios.urls")),

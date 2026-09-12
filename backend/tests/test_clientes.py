@@ -105,9 +105,12 @@ def test_documento_incompativel_com_tipo_pessoa_e_rejeitado(auth_client):
 
 
 @pytest.mark.django_db
-def test_mascaramento_documento_lgpd(auth_client):
+def test_mascaramento_documento_lgpd(auth_client, user):
     c = Cliente.objects.create(
-        nome="Cliente LGPD", tipo_pessoa=TipoPessoa.FISICA, documento=CPF_VALIDO
+        nome="Cliente LGPD",
+        tipo_pessoa=TipoPessoa.FISICA,
+        documento=CPF_VALIDO,
+        owner=user,
     )
 
     # Listagem -> Documento deve estar mascarado (529.***.***-25)
@@ -127,9 +130,9 @@ def test_mascaramento_documento_lgpd(auth_client):
 
 
 @pytest.mark.django_db
-def test_listar_clientes_paginado(auth_client):
-    Cliente.objects.create(nome="Ana", tipo_pessoa=TipoPessoa.FISICA)
-    Cliente.objects.create(nome="Bruno", tipo_pessoa=TipoPessoa.FISICA)
+def test_listar_clientes_paginado(auth_client, user):
+    Cliente.objects.create(nome="Ana", tipo_pessoa=TipoPessoa.FISICA, owner=user)
+    Cliente.objects.create(nome="Bruno", tipo_pessoa=TipoPessoa.FISICA, owner=user)
 
     response = auth_client.get(URL)
 
@@ -139,9 +142,9 @@ def test_listar_clientes_paginado(auth_client):
 
 
 @pytest.mark.django_db
-def test_atualizar_cliente(auth_client):
+def test_atualizar_cliente(auth_client, user):
     cliente = Cliente.objects.create(
-        nome="Ana", tipo_pessoa=TipoPessoa.FISICA, documento=CPF_VALIDO
+        nome="Ana", tipo_pessoa=TipoPessoa.FISICA, documento=CPF_VALIDO, owner=user
     )
 
     response = auth_client.patch(
@@ -154,8 +157,8 @@ def test_atualizar_cliente(auth_client):
 
 
 @pytest.mark.django_db
-def test_deletar_cliente(auth_client):
-    cliente = Cliente.objects.create(nome="Ana", tipo_pessoa=TipoPessoa.FISICA)
+def test_deletar_cliente(auth_client, user):
+    cliente = Cliente.objects.create(nome="Ana", tipo_pessoa=TipoPessoa.FISICA, owner=user)
 
     response = auth_client.delete(f"{URL}{cliente.pk}/")
 
@@ -164,13 +167,14 @@ def test_deletar_cliente(auth_client):
 
 
 @pytest.mark.django_db
-def test_deletar_cliente_com_faturas_retorna_409_conflito(auth_client):
-    cliente = Cliente.objects.create(nome="Ana", tipo_pessoa=TipoPessoa.FISICA)
+def test_deletar_cliente_com_faturas_retorna_409_conflito(auth_client, user):
+    cliente = Cliente.objects.create(nome="Ana", tipo_pessoa=TipoPessoa.FISICA, owner=user)
     Fatura.objects.create(
         numero="FAT-PROT-1",
         cliente=cliente,
         valor="100.00",
         vencimento="2026-09-30",
+        owner=user,
     )
 
     response = auth_client.delete(f"{URL}{cliente.pk}/")
@@ -185,9 +189,9 @@ def test_deletar_cliente_com_faturas_retorna_409_conflito(auth_client):
 
 
 @pytest.mark.django_db
-def test_filtrar_por_nome(auth_client):
-    Cliente.objects.create(nome="Ana Paula", tipo_pessoa=TipoPessoa.FISICA)
-    Cliente.objects.create(nome="Bruno", tipo_pessoa=TipoPessoa.FISICA)
+def test_filtrar_por_nome(auth_client, user):
+    Cliente.objects.create(nome="Ana Paula", tipo_pessoa=TipoPessoa.FISICA, owner=user)
+    Cliente.objects.create(nome="Bruno", tipo_pessoa=TipoPessoa.FISICA, owner=user)
 
     response = auth_client.get(URL, {"nome": "ana"})
 
@@ -197,11 +201,11 @@ def test_filtrar_por_nome(auth_client):
 
 
 @pytest.mark.django_db
-def test_filtrar_por_documento(auth_client):
+def test_filtrar_por_documento(auth_client, user):
     Cliente.objects.create(
-        nome="Ana", tipo_pessoa=TipoPessoa.FISICA, documento=CPF_VALIDO
+        nome="Ana", tipo_pessoa=TipoPessoa.FISICA, documento=CPF_VALIDO, owner=user
     )
-    Cliente.objects.create(nome="Bruno", tipo_pessoa=TipoPessoa.FISICA)
+    Cliente.objects.create(nome="Bruno", tipo_pessoa=TipoPessoa.FISICA, owner=user)
 
     response = auth_client.get(URL, {"documento": "529.982"})
 
@@ -210,9 +214,9 @@ def test_filtrar_por_documento(auth_client):
 
 
 @pytest.mark.django_db
-def test_buscar_por_termo(auth_client):
-    Cliente.objects.create(nome="Ana Paula", tipo_pessoa=TipoPessoa.FISICA)
-    Cliente.objects.create(nome="Bruno", tipo_pessoa=TipoPessoa.FISICA)
+def test_buscar_por_termo(auth_client, user):
+    Cliente.objects.create(nome="Ana Paula", tipo_pessoa=TipoPessoa.FISICA, owner=user)
+    Cliente.objects.create(nome="Bruno", tipo_pessoa=TipoPessoa.FISICA, owner=user)
 
     response = auth_client.get(URL, {"search": "paula"})
 
@@ -239,14 +243,14 @@ def test_criar_sem_autenticacao_retorna_401(api_client):
 
 
 @pytest.mark.django_db
-def test_atualizar_sem_autenticacao_retorna_401(api_client):
-    cliente = Cliente.objects.create(nome="Ana", tipo_pessoa=TipoPessoa.FISICA)
+def test_atualizar_sem_autenticacao_retorna_401(api_client, user):
+    cliente = Cliente.objects.create(nome="Ana", tipo_pessoa=TipoPessoa.FISICA, owner=user)
     response = api_client.patch(f"{URL}{cliente.pk}/", {"nome": "X"}, format="json")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 @pytest.mark.django_db
-def test_deletar_sem_autenticacao_retorna_401(api_client):
-    cliente = Cliente.objects.create(nome="Ana", tipo_pessoa=TipoPessoa.FISICA)
+def test_deletar_sem_autenticacao_retorna_401(api_client, user):
+    cliente = Cliente.objects.create(nome="Ana", tipo_pessoa=TipoPessoa.FISICA, owner=user)
     response = api_client.delete(f"{URL}{cliente.pk}/")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED

@@ -13,12 +13,21 @@ from .serializers import CobrancaRecorrenteSerializer, FaturaSerializer
 class FaturaViewSet(viewsets.ModelViewSet):
     """ViewSet para CRUD e ações de faturas."""
 
-    queryset = Fatura.objects.select_related("cliente").all()
     serializer_class = FaturaSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["cliente", "tipo", "status"]
     search_fields = ["numero", "descricao"]
     ordering_fields = ["vencimento", "valor", "created_at"]
+
+    def get_queryset(self):
+        """Multi-tenancy: vale para todas as actions, inclusive pagar/cancelar."""
+        return Fatura.objects.select_related("cliente").filter(
+            owner=self.request.user
+        )
+
+    def perform_create(self, serializer):
+        """Owner é sempre o usuário autenticado — nunca vem do payload."""
+        serializer.save(owner=self.request.user)
 
     @action(detail=True, methods=["post"])
     def pagar(self, request, pk=None):
@@ -38,9 +47,18 @@ class FaturaViewSet(viewsets.ModelViewSet):
 class CobrancaRecorrenteViewSet(viewsets.ModelViewSet):
     """ViewSet para CRUD de cobranças recorrentes."""
 
-    queryset = CobrancaRecorrente.objects.select_related("cliente").all()
     serializer_class = CobrancaRecorrenteSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["cliente", "tipo", "periodicidade", "ativa"]
     search_fields = ["descricao"]
     ordering_fields = ["proxima_cobranca", "valor", "created_at"]
+
+    def get_queryset(self):
+        """Multi-tenancy: cada usuário acessa apenas suas cobranças."""
+        return CobrancaRecorrente.objects.select_related("cliente").filter(
+            owner=self.request.user
+        )
+
+    def perform_create(self, serializer):
+        """Owner é sempre o usuário autenticado — nunca vem do payload."""
+        serializer.save(owner=self.request.user)

@@ -1,0 +1,1 @@
+Vence hoje: fatura {{ numero }} — R$ {{ valor }}

@@ -21,6 +21,7 @@ class ClienteSerializer(serializers.ModelSerializer):
             "telefone",
             "endereco",
             "ativo",
+            "notificacoes_ativas",
             "created_at",
             "updated_at",
         )

@@ -1,5 +1,7 @@
 """Serializers para Fatura e CobrancaRecorrente."""
 from rest_framework import serializers
+
+from apps.clientes.models import Cliente
 from .models import CobrancaRecorrente, Fatura
 
 
@@ -26,6 +28,14 @@ class FaturaSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "status", "data_pagamento", "created_at", "updated_at"]
 
+    def validate_cliente(self, value: Cliente) -> Cliente:
+        """Impede vincular fatura a cliente de outro usuário (multi-tenancy)."""
+        if value.owner_id != self.context["request"].user.pk:
+            raise serializers.ValidationError(
+                "Cliente não encontrado para este usuário."
+            )
+        return value
+
 
 class CobrancaRecorrenteSerializer(serializers.ModelSerializer):
     """Serializer do modelo CobrancaRecorrente."""
@@ -50,3 +60,10 @@ class CobrancaRecorrenteSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "ultima_execucao", "created_at", "updated_at"]
+
+    def validate_cliente(self, value: Cliente) -> Cliente:
+        """Impede vincular cobrança a cliente de outro usuário (multi-tenancy)."""
+        if value.owner_id != self.context["request"].user.pk:
+            raise serializers.ValidationError(
+                "Cliente não encontrado para este usuário.")
+        return value

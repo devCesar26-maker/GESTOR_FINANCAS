@@ -4,6 +4,7 @@ Modelos do app Clientes.
 Camada de dados: apenas representação do domínio (clientes e fornecedores).
 Regras de negócio que envolvem esses dados ficam em services.py.
 """
+from django.conf import settings
 from django.db import models
 
 
@@ -44,6 +45,18 @@ class Cliente(models.Model):
     telefone = models.CharField("telefone", max_length=20, blank=True)
     endereco = models.CharField("endereço", max_length=255, blank=True)
     ativo = models.BooleanField("ativo", default=True)
+    # Quando False, este cliente/fornecedor NUNCA recebe lembretes
+    # automáticos de vencimento, mesmo que as condições de data sejam
+    # satisfeitas (Fase 3).
+    notificacoes_ativas = models.BooleanField(
+        "notificações ativas", default=True
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="clientes",
+        verbose_name="dono",
+    )
 
     created_at = models.DateTimeField("criado em", auto_now_add=True)
     updated_at = models.DateTimeField("atualizado em", auto_now=True)

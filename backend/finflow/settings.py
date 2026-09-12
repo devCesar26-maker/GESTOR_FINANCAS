@@ -27,6 +27,13 @@ def env_list(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in os.getenv(name, default).split(",") if item.strip()]
 
 
+def env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-me-em-producao")
 DEBUG = env_bool("DEBUG", default=False)
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", default="localhost,127.0.0.1")
@@ -46,7 +53,9 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "corsheaders",
     "django_filters",
+    "anymail",
     # Apps do FinFlow
+    "apps.usuarios",
     "apps.clientes",
     "apps.faturamento",
     "apps.relatorios",
@@ -131,6 +140,13 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
 # ---------------------------------------------------------------------------
 # Documentação da API (drf-spectacular / OpenAPI)
 # ---------------------------------------------------------------------------
@@ -154,6 +170,26 @@ CORS_ALLOWED_ORIGINS = env_list(
 )
 
 # ---------------------------------------------------------------------------
+# E-mail (django-anymail)
+# ---------------------------------------------------------------------------
+# Com BREVO_API_KEY definida, o envio vai pela API da Brevo; sem a chave
+# (desenvolvimento/testes), cai no backend de console — nada parte de
+# verdade por acidente.
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
+if BREVO_API_KEY:
+    EMAIL_BACKEND = "anymail.backends.brevo.EmailBackend"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+ANYMAIL = {"BREVO_API_KEY": BREVO_API_KEY}
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL", "FinFlow <nao-responda@finflow.local>"
+)
+
+# Lembrete: grafia "LEMRETE" mantida conforme especificação do projeto.
+LEMRETE_DIAS_ANTES = env_int("LEMRETE_DIAS_ANTES", 3)
+
+# ---------------------------------------------------------------------------
 # Celery
 # ---------------------------------------------------------------------------
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
@@ -173,6 +209,10 @@ CELERY_BEAT_SCHEDULE = {
     "marcar-faturas-vencidas-diario": {
         "task": "apps.faturamento.tasks.task_marcar_faturas_vencidas",
         "schedule": crontab(hour=0, minute=0),
+    },
+    "enviar-lembretes-vencimento-diario": {
+        "task": "apps.faturamento.tasks.task_enviar_lembretes_vencimento",
+        "schedule": crontab(hour=8, minute=0),
     },
 }
 

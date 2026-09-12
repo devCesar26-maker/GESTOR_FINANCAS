@@ -1,0 +1,12 @@
+Olá, {{ cliente_nome }},
+
+A fatura {{ numero }} vence HOJE.
+
+  Valor:      R$ {{ valor }}
+  Vencimento: hoje, {{ vencimento }}
+  Descrição:  {{ descricao }}
+
+Caso já tenha pago, desconsidere esta mensagem.
+
+Atenciosamente,
+{{ remetente }}

@@ -14,3 +14,6 @@ DATABASES = {
         "NAME": ":memory:",
     }
 }
+
+# Nunca envia e-mail de verdade nos testes; captura em django.core.mail.outbox.
+EMAIL_BACKEND = "anymail.backends.test.EmailBackend"

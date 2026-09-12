@@ -15,7 +15,7 @@ FLUXO_CAIXA_URL = "/api/relatorios/fluxo-caixa/"
 
 
 @pytest.fixture
-def fatura_pendente(cliente):
+def fatura_pendente(cliente, user):
     return Fatura.objects.create(
         numero="FAT-001",
         cliente=cliente,
@@ -24,11 +24,12 @@ def fatura_pendente(cliente):
         valor=Decimal("1000.00"),
         status=StatusFatura.PENDENTE,
         vencimento=timezone.localdate(),
+        owner=user,
     )
 
 
 @pytest.fixture
-def cobranca_recorrente(cliente):
+def cobranca_recorrente(cliente, user):
     return CobrancaRecorrente.objects.create(
         cliente=cliente,
         descricao="Assinatura Mensal",
@@ -38,6 +39,7 @@ def cobranca_recorrente(cliente):
         dia_vencimento=10,
         proxima_cobranca=timezone.localdate(),
         ativa=True,
+        owner=user,
     )
 
 
@@ -81,7 +83,7 @@ def test_service_cancelar_fatura_ja_paga_erro(fatura_pendente):
 
 
 @pytest.mark.django_db
-def test_service_marcar_faturas_vencidas(cliente):
+def test_service_marcar_faturas_vencidas(cliente, user):
     ontem = timezone.localdate() - timedelta(days=1)
     Fatura.objects.create(
         numero="FAT-VENCIDA",
@@ -89,6 +91,7 @@ def test_service_marcar_faturas_vencidas(cliente):
         valor=Decimal("500.00"),
         status=StatusFatura.PENDENTE,
         vencimento=ontem,
+        owner=user,
     )
     qtd = services.marcar_faturas_vencidas()
     assert qtd == 1
@@ -190,7 +193,7 @@ def test_crud_cobranca_recorrente(auth_client, cliente):
 
 
 @pytest.mark.django_db
-def test_endpoint_relatorio_fluxo_caixa(auth_client, cliente):
+def test_endpoint_relatorio_fluxo_caixa(auth_client, user, cliente):
     Fatura.objects.create(
         numero="FAT-R1",
         cliente=cliente,
@@ -198,6 +201,7 @@ def test_endpoint_relatorio_fluxo_caixa(auth_client, cliente):
         valor=Decimal("1000.00"),
         status=StatusFatura.PAGA,
         vencimento=timezone.localdate(),
+        owner=user,
     )
     Fatura.objects.create(
         numero="FAT-P1",
@@ -206,6 +210,7 @@ def test_endpoint_relatorio_fluxo_caixa(auth_client, cliente):
         valor=Decimal("400.00"),
         status=StatusFatura.PAGA,
         vencimento=timezone.localdate(),
+        owner=user,
     )
 
     response = auth_client.get(FLUXO_CAIXA_URL)

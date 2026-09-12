@@ -21,10 +21,21 @@ class ClienteFilter(django_filters.FilterSet):
 
 
 class ClienteViewSet(viewsets.ModelViewSet):
-    queryset = Cliente.objects.all()
     filter_backends = (DjangoFilterBackend, filters.SearchFilter)
     filterset_class = ClienteFilter
     search_fields = ("nome", "documento", "email", "telefone")
+
+    def get_queryset(self):
+        """Multi-tenancy: cada usuário acessa apenas seus clientes/fornecedores.
+
+        Vale para todas as actions (list, retrieve, update, destroy), pois
+        get_object() consulta este queryset — registro de outro usuário => 404.
+        """
+        return Cliente.objects.filter(owner=self.request.user)
+
+    def perform_create(self, serializer):
+        """Owner é sempre o usuário autenticado — nunca vem do payload."""
+        serializer.save(owner=self.request.user)
 
     def get_serializer_class(self):
         if self.action == "list":

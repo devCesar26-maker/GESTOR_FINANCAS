@@ -6,6 +6,7 @@ faturamento. Regras de negócio (pagar fatura, gerar cobrança recorrente,
 marcar vencidas) ficam em services.py — os models expõem apenas dados e
 propriedades de leitura puras.
 """
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -58,6 +59,20 @@ class Fatura(models.Model):
     vencimento = models.DateField("vencimento")
     data_pagamento = models.DateTimeField(
         "data de pagamento", blank=True, null=True
+    )
+    # Controle de idempotência dos lembretes de vencimento (Fase 3):
+    # gravados após o envio; None = lembrete ainda não enviado.
+    lembrete_previo_enviado_em = models.DateTimeField(
+        "lembrete prévio enviado em", blank=True, null=True
+    )
+    lembrete_vencimento_enviado_em = models.DateTimeField(
+        "lembrete de vencimento enviado em", blank=True, null=True
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="faturas",
+        verbose_name="dono",
     )
 
     created_at = models.DateTimeField("criado em", auto_now_add=True)
@@ -129,6 +144,12 @@ class CobrancaRecorrente(models.Model):
     ativa = models.BooleanField("ativa", default=True)
     ultima_execucao = models.DateTimeField(
         "última execução", blank=True, null=True
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="cobrancas_recorrentes",
+        verbose_name="dono",
     )
 
     created_at = models.DateTimeField("criado em", auto_now_add=True)

@@ -33,11 +33,12 @@ def cliente(user):
         nome="Empresa Exemplo Ltda",
         papel=Papel.CLIENTE,
         tipo_pessoa=TipoPessoa.JURIDICA,
+        owner=user,
     )
 
 
 @pytest.fixture
-def fatura(cliente):
+def fatura(cliente, user):
     return Fatura.objects.create(
         numero="FT-2026-0001",
         cliente=cliente,
@@ -45,4 +46,5 @@ def fatura(cliente):
         tipo=TipoFatura.A_RECEBER,
         valor="1500.00",
         vencimento="2026-09-30",
+        owner=user,
     )

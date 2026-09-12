@@ -1,0 +1,12 @@
+Olá, {{ cliente_nome }},
+
+Passando para lembrar que a fatura {{ numero }} vence em {{ dias }} dia(s).
+
+  Valor:      R$ {{ valor }}
+  Vencimento: {{ vencimento }}
+  Descrição:  {{ descricao }}
+
+Se o pagamento já foi efetuado, por favor desconsidere este aviso.
+
+Atenciosamente,
+{{ remetente }}

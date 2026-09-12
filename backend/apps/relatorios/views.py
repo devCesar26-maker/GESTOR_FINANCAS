@@ -15,5 +15,7 @@ class FluxoCaixaView(APIView):
     def get(self, request):
         inicio = request.query_params.get("inicio")
         fim = request.query_params.get("fim")
-        dados = services.gerar_fluxo_caixa(inicio=inicio, fim=fim)
+        dados = services.gerar_fluxo_caixa(
+            inicio=inicio, fim=fim, owner=request.user
+        )
         return Response(dados, status=status.HTTP_200_OK)

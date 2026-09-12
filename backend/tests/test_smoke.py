@@ -26,10 +26,10 @@ def test_criar_cliente(cliente):
 
 
 @pytest.mark.django_db
-def test_documento_cliente_e_unico():
-    Cliente.objects.create(nome="Empresa A", documento="12.345.678/0001-90")
+def test_documento_cliente_e_unico(user):
+    Cliente.objects.create(nome="Empresa A", documento="12.345.678/0001-90", owner=user)
     with pytest.raises(Exception):
-        Cliente.objects.create(nome="Empresa B", documento="12.345.678/0001-90")
+        Cliente.objects.create(nome="Empresa B", documento="12.345.678/0001-90", owner=user)
 
 
 @pytest.mark.django_db
@@ -54,7 +54,7 @@ def test_fatura_nao_aceita_valor_negativo(cliente):
 
 
 @pytest.mark.django_db
-def test_criar_cobranca_recorrente(cliente):
+def test_criar_cobranca_recorrente(cliente, user):
     cobranca = CobrancaRecorrente.objects.create(
         cliente=cliente,
         descricao="Mensalidade",
@@ -62,6 +62,7 @@ def test_criar_cobranca_recorrente(cliente):
         periodicidade=Periodicidade.MENSAL,
         dia_vencimento=10,
         proxima_cobranca="2026-10-10",
+        owner=user,
     )
     assert cobranca.ativa is True
     assert cobranca.dia_vencimento == 10
