@@ -38,9 +38,10 @@ class Cliente(models.Model):
         choices=TipoPessoa.choices,
         default=TipoPessoa.FISICA,
     )
-    documento = models.CharField(
-        "CPF/CNPJ", max_length=20, unique=True, blank=True, null=True
-    )
+    # NOTA (multi-tenancy): o documento NÃO é único globalmente — a mesma
+    # pessoa/empresa pode ser cliente de vários gestores ao mesmo tempo. A
+    # unicidade vale apenas DENTRO de cada owner (constraint composta no Meta).
+    documento = models.CharField("CPF/CNPJ", max_length=20, blank=True, null=True)
     email = models.EmailField("e-mail", blank=True)
     telefone = models.CharField("telefone", max_length=20, blank=True)
     endereco = models.CharField("endereço", max_length=255, blank=True)
@@ -67,6 +68,15 @@ class Cliente(models.Model):
         ordering = ["nome"]
         indexes = [
             models.Index(fields=["papel", "ativo"], name="cli_papel_ativo_idx"),
+        ]
+        constraints = [
+            # Mesmo documento só se repete entre owners diferentes, nunca
+            # duas vezes no cadastro do mesmo gestor. Nulls são permitidos
+            # (documento é opcional) e não participam da comparação.
+            models.UniqueConstraint(
+                fields=["owner", "documento"],
+                name="uniq_cliente_owner_documento",
+            ),
         ]
 
     def __str__(self) -> str:

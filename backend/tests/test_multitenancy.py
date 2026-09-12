@@ -3,8 +3,9 @@ Testes de multi-tenancy (Fase 1).
 
 Cobrem: isolamento de listagem e detalhe entre usuários (404, não 403),
 para Cliente, Fatura e CobrancaRecorrente; ignorância de "owner" no payload;
-filtro de owner no relatório de fluxo de caixa; e o endpoint público de
-registro (criação bem-sucedida e e-mail duplicado rejeitado).
+filtro de owner no relatório de fluxo de caixa; o endpoint público de
+registro (criação bem-sucedida e e-mail duplicado rejeitado); e unicidade
+de documento por owner (constraint composta owner + documento).
 """
 
 from decimal import Decimal
@@ -12,6 +13,7 @@ from decimal import Decimal
 import pytest
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.test import APIClient
 
 from apps.clientes.models import Cliente, Papel, TipoPessoa
 from apps.faturamento.models import (
@@ -30,6 +32,7 @@ REGISTRO_URL = "/api/auth/registro/"
 
 CPF_A = "529.982.247-25"
 CPF_B = "153.509.490-60"
+CPF_C = "111.444.777-35"  # válido pelo dígito verificador (usado via API)
 
 
 # ---------------------------------------------------------------------------
@@ -52,15 +55,20 @@ def user_b(django_user_model):
 
 
 @pytest.fixture
-def client_a(api_client, user_a):
-    api_client.force_authenticate(user=user_a)
-    return api_client
+def client_a(user_a):
+    # Clientes SEPARADOS por fixture: force_authenticate é por instância;
+    # compartilhar o mesmo APIClient faria a última autenticação (user_b)
+    # valer para os dois nomes e mascararia o usuário real das requisições.
+    client = APIClient()
+    client.force_authenticate(user=user_a)
+    return client
 
 
 @pytest.fixture
-def client_b(api_client, user_b):
-    api_client.force_authenticate(user=user_b)
-    return api_client
+def client_b(user_b):
+    client = APIClient()
+    client.force_authenticate(user=user_b)
+    return client
 
 
 @pytest.fixture
@@ -80,7 +88,7 @@ def cliente_b(user_b):
         nome="Cliente de B",
         papel=Papel.CLIENTE,
         tipo_pessoa=TipoPessoa.FISICA,
-        documento=CPF_B,
+        documento=CPF_C,
         owner=user_b,
     )
 
@@ -399,3 +407,81 @@ def test_registro_e_publico_sem_autenticacao(api_client):
         format="json",
     )
     assert response.status_code == status.HTTP_201_CREATED
+
+
+# ---------------------------------------------------------------------------
+# Unicidade de documento por owner (multi-tenancy)
+# ---------------------------------------------------------------------------
+
+
+def payload_documento(**overrides):
+    payload = {
+        "nome": "Pessoa Comum",
+        "papel": Papel.CLIENTE,
+        "tipo_pessoa": TipoPessoa.FISICA,
+        "documento": CPF_A,
+    }
+    payload.update(overrides)
+    return payload
+
+
+@pytest.mark.django_db
+def test_mesmo_documento_pode_ser_cadastrado_por_owners_diferentes(client_a, client_b):
+    """A mesma pessoa (mesmo CPF) pode ser cliente de gestores diferentes."""
+    resp_a = client_a.post(CLIENTES_URL, payload_documento(), format="json")
+    resp_b = client_b.post(CLIENTES_URL, payload_documento(), format="json")
+
+    assert resp_a.status_code == status.HTTP_201_CREATED
+    assert resp_b.status_code == status.HTTP_201_CREATED
+    # Dois cadastros independentes, um para cada owner.
+    assert Cliente.objects.filter(documento=CPF_A).count() == 2
+
+
+@pytest.mark.django_db
+def test_documento_de_outro_owner_nao_bloqueia_cadastro(client_a, cliente_b):
+    """Documento já cadastrado pelo owner B (fixture) não impede o owner A."""
+    response = client_a.post(
+        CLIENTES_URL,
+        payload_documento(documento=CPF_C, nome="Cadastro de A"),
+        format="json",
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+
+@pytest.mark.django_db
+def test_mesmo_owner_nao_pode_cadastrar_documento_duplicado(client_a):
+    first = client_a.post(CLIENTES_URL, payload_documento(), format="json")
+    second = client_a.post(
+        CLIENTES_URL, payload_documento(nome="Segundo cadastro"), format="json"
+    )
+
+    assert first.status_code == status.HTTP_201_CREATED
+    assert second.status_code == status.HTTP_400_BAD_REQUEST
+    assert "documento" in second.data
+
+
+@pytest.mark.django_db
+def test_edicao_pode_manter_documento_do_proprio_owner(client_a, cliente_a):
+    """Editar outro atributo do próprio cliente não esbarra na unicidade."""
+    response = client_a.patch(
+        f"{CLIENTES_URL}{cliente_a.id}/", {"telefone": "1199999-9999"}, format="json"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["telefone"] == "1199999-9999"
+
+
+@pytest.mark.django_db
+def test_constraint_owner_documento_no_banco(user_a, user_b):
+    """A constraint composta (owner, documento) vale no nível do banco."""
+    Cliente.objects.create(
+        nome="A1", tipo_pessoa=TipoPessoa.FISICA, documento=CPF_A, owner=user_a
+    )
+    # Mesmo documento, owner diferente: permitido.
+    Cliente.objects.create(
+        nome="B1", tipo_pessoa=TipoPessoa.FISICA, documento=CPF_A, owner=user_b
+    )
+    # Mesmo documento, mesmo owner: viola a constraint composta.
+    with pytest.raises(Exception):
+        Cliente.objects.create(
+            nome="A2", tipo_pessoa=TipoPessoa.FISICA, documento=CPF_A, owner=user_a
+        )

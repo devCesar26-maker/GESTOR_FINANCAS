@@ -31,12 +31,17 @@ class ClienteSerializer(serializers.ModelSerializer):
         value = (value or "").strip() or None
         if value is None:
             return value
-        queryset = Cliente.objects.all()
+        # Multi-tenancy: a duplicidade de documento vale apenas dentro do
+        # cadastro do próprio gestor (owner). A mesma pessoa/empresa pode ser
+        # cliente de vários gestores ao mesmo tempo.
+        queryset = Cliente.objects.filter(
+            owner=self.context["request"].user
+        )
         if self.instance is not None:
             queryset = queryset.exclude(pk=self.instance.pk)
         if queryset.filter(documento=value).exists():
             raise serializers.ValidationError(
-                "Já existe um cliente com este documento."
+                "Já existe um cliente com este documento no seu cadastro."
             )
         return value
 

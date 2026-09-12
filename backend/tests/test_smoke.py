@@ -26,7 +26,8 @@ def test_criar_cliente(cliente):
 
 
 @pytest.mark.django_db
-def test_documento_cliente_e_unico(user):
+def test_documento_unico_por_owner(user):
+    # Unicidade composta (owner, documento): repetir no MESMO owner viola.
     Cliente.objects.create(nome="Empresa A", documento="12.345.678/0001-90", owner=user)
     with pytest.raises(Exception):
         Cliente.objects.create(nome="Empresa B", documento="12.345.678/0001-90", owner=user)
