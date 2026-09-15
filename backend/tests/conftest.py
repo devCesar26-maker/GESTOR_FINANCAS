@@ -1,6 +1,19 @@
 """Fixtures compartilhadas dos testes do FinFlow."""
 import pytest
+from django.core.cache import cache
 from rest_framework.test import APIClient
+
+
+@pytest.fixture(autouse=True)
+def _limpiar_cache_throttle():
+    """Cada teste começa com o cache de throttling limpo.
+
+    DRF usa o cache padrão (LocMemCache) para os rate limits; sem limpá-lo
+    entre testes, as tentativas de login/registro de um teste vazam sobre
+    o seguinte e causam 429 espúrios.
+    """
+    yield
+    cache.clear()
 
 from apps.clientes.models import Cliente, Papel, TipoPessoa
 from apps.faturamento.models import Fatura, TipoFatura
@@ -10,6 +23,19 @@ from apps.faturamento.models import Fatura, TipoFatura
 def api_client():
     """APIClient sem autenticação."""
     return APIClient()
+
+
+@pytest.fixture
+def csrf_client():
+    """APIClient que EXIGE o duplo envio CSRF de verdade.
+
+    O padrão do APIClient é enforce_csrf_checks=False, que marca a request
+    com _dont_enforce_csrf_checks=True e FAZ BYPASS do CsrfViewMiddleware
+    (inclusive do decorator csrf_protect aplicado às views de token). Sem
+    esta fixture, um teste que espera 403 por CSRF não está testando nada:
+    a request simplesmente ignora a proteção.
+    """
+    return APIClient(enforce_csrf_checks=True)
 
 
 @pytest.fixture

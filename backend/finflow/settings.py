@@ -63,6 +63,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "finflow.middleware.MaxBodySizeMiddleware",
+    "finflow.middleware.CSPFrameAncestorsMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -131,11 +133,15 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "20/minute",
         "user": "100/minute",
+        # Anti força bruta / criação de contas em massa: 5 tentativas por
+        # minuto por IP nos endpoints públicos de autenticação.
+        "login": "5/minute",
+        "registro": "5/minute",
     },
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
@@ -172,6 +178,9 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = env_list(
     "CORS_ALLOWED_ORIGINS", default="http://localhost:5173"
 )
+# O refresh token viaja num cookie: si SPA e API estivessem em origens
+# distintas, o navegador exige credenciales explícitas para enviarlas.
+CORS_ALLOW_CREDENTIALS = True
 
 # ---------------------------------------------------------------------------
 # E-mail (django-anymail)
@@ -192,6 +201,21 @@ DEFAULT_FROM_EMAIL = os.getenv(
 
 # Lembrete: grafia "LEMRETE" mantida conforme especificação do projeto.
 LEMRETE_DIAS_ANTES = env_int("LEMRETE_DIAS_ANTES", 3)
+
+# ---------------------------------------------------------------------------
+# Cache (Redis) — usado pelo throttling do DRF
+# ---------------------------------------------------------------------------
+# Com LocMemCache (padrão do Django) cada worker de Gunicorn teria sua
+# própria contabilidade de rate limit, esvaziando a proteção. Redis é
+# compartido entre workers: a contagem por IP/usuario é real. Usa a mesma
+# instância Redis do stack (Celery), na DB 1 (a 0 é do broker).
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/1")
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+    }
+}
 
 # ---------------------------------------------------------------------------
 # Celery
@@ -239,8 +263,39 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
+# HSTS: header Strict-Transport-Security em toda resposta HTTPS (auditado:
+# já estava configurado — verificado por teste em test_seguridad.py).
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
-CSRF_COOKIE_HTTPONLY = True
+# El cookie csrftoken NÃO é httpOnly a propósito: o frontend precisa lerlo
+# para enviarlo no header X-CSRFToken (doble envío CSRF). El cookie do
+# refresh token SÍ é httpOnly (ver apps.usuarios.views).
+CSRF_COOKIE_HTTPONLY = False
 SESSION_COOKIE_HTTPONLY = True
+
+# HTTPS obrigatório em produção: por padrão ativo quando DEBUG=False
+# (docker-compose de dev define DEBUG=true explicitamente). Override
+# explícito via variáveis de ambiente se necessário.
+SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", default=not DEBUG)
+SESSION_COOKIE_SECURE = env_bool("SESSION_COOKIE_SECURE", default=not DEBUG)
+CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", default=not DEBUG)
+# Cookie httpOnly do refresh token (ver apps.usuarios.views).
+REFRESH_COOKIE_SECURE = env_bool("REFRESH_COOKIE_SECURE", default=not DEBUG)
+
+# Doble envío CSRF: o frontend (vite :5173) envia o header X-CSRFToken nas
+# rotas de token. Em produção frontend+API são mesma origem (whitenoise);
+# em dev o proxy do vite faz o Origin diferir do Host do backend.
+CSRF_TRUSTED_ORIGINS = env_list(
+    "CSRF_TRUSTED_ORIGINS", default="http://localhost:5173"
+)
+
+# 403 CSRF em formato JSON (a API é consumida por JS, não por formulários).
+CSRF_FAILURE_VIEW = "apps.usuarios.views.csrf_failure_json"
+
+# Limite de payload da API (JSON): mitigação básica de DoS a nível de
+# aplicação. Proteção real contra DDoS exige infraestructura (WAF/CDN) —
+# ver README. DATA_UPLOAD_MAX_MEMORY_SIZE cobre multipart/form-data;
+# o middleware MaxBodySizeMiddleware cobre corpos JSON.
+MAX_BODY_SIZE_BYTES = env_int("MAX_BODY_SIZE_BYTES", 1024 * 1024)  # 1 MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_BODY_SIZE_BYTES

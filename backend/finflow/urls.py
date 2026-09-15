@@ -11,13 +11,26 @@ from drf_spectacular.views import (
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from apps.usuarios.views import (
+    LogoutView,
+    TokenObtainPairCookieView,
+    TokenRefreshCookieView,
+    csrf_token_view,
+)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    # Autenticação JWT
-    path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
-    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    # Autenticação JWT (login com rate limit: 5/min por IP). O refresh
+    # token viaja num cookie httpOnly — nunca no body da resposta.
+    path("api/token/", TokenObtainPairCookieView.as_view(), name="token_obtain_pair"),
+    path(
+        "api/token/refresh/",
+        TokenRefreshCookieView.as_view(),
+        name="token_refresh",
+    ),
+    path("api/token/logout/", LogoutView.as_view(), name="token_logout"),
+    # Define o cookie csrftoken para o duplo envio CSRF (login/refresh).
+    path("api/csrf/", csrf_token_view, name="csrf_token"),
     # Documentação OpenAPI/Swagger
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(

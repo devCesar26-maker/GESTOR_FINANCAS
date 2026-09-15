@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import api from '../api/client'
 import Layout from '../components/Layout'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Clientes() {
   const [clientes, setClientes] = useState([])
@@ -10,6 +11,10 @@ export default function Clientes() {
   const [modalError, setModalError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  // Modal de confirmação de exclusão (substitui window.confirm nativo).
+  const [clienteParaExcluir, setClienteParaExcluir] = useState(null)
+  const [excluindo, setExcluindo] = useState(false)
+
   const [formData, setFormData] = useState({
     nome: '',
     papel: 'cliente',
@@ -17,6 +22,7 @@ export default function Clientes() {
     documento: '',
     email: '',
     telefone: '',
+    notificacoes_ativas: true,
   })
 
   useEffect(() => {
@@ -43,7 +49,7 @@ export default function Clientes() {
     try {
       await api.post('/clientes/', formData)
       setShowModal(false)
-      setFormData({ nome: '', papel: 'cliente', tipo_pessoa: 'pf', documento: '', email: '', telefone: '' })
+      setFormData({ nome: '', papel: 'cliente', tipo_pessoa: 'pf', documento: '', email: '', telefone: '', notificacoes_ativas: true })
       fetchClientes()
     } catch (err) {
       console.error(err)
@@ -66,16 +72,21 @@ export default function Clientes() {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Tem certeza que deseja remover este cliente?')) return
+  const handleDelete = async () => {
+    if (!clienteParaExcluir) return
+    setExcluindo(true)
     setPageError('')
     try {
-      await api.delete(`/clientes/${id}/`)
+      await api.delete(`/clientes/${clienteParaExcluir.id}/`)
+      setClienteParaExcluir(null)
       fetchClientes()
     } catch (err) {
       console.error(err)
       const msg = err.response?.data?.detail || 'Não foi possível remover o cliente.'
       setPageError(msg)
+      setClienteParaExcluir(null)
+    } finally {
+      setExcluindo(false)
     }
   }
 
@@ -102,17 +113,18 @@ export default function Clientes() {
               <th>Tipo</th>
               <th>Documento</th>
               <th>Contato</th>
+              <th>Lembretes</th>
               <th style={{ textAlign: 'right' }}>Ações</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Carregando...</td>
+                <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Carregando...</td>
               </tr>
             ) : clientes.length === 0 ? (
               <tr>
-                <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Nenhum cliente cadastrado.</td>
+                <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Nenhum cliente cadastrado.</td>
               </tr>
             ) : (
               clientes.map((c) => (
@@ -126,8 +138,13 @@ export default function Clientes() {
                   <td>{c.tipo_pessoa === 'pf' ? 'Pessoa Física' : 'Pessoa Jurídica'}</td>
                   <td>{c.documento || '—'}</td>
                   <td>{c.email || c.telefone || '—'}</td>
+                  <td>
+                    {c.notificacoes_ativas !== false
+                      ? <span className="badge badge-paga">lembretes ✓</span>
+                      : <span className="badge badge-pendente">sem lembretes</span>}
+                  </td>
                   <td style={{ textAlign: 'right' }}>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(c.id)}>
+                    <button className="btn btn-danger btn-sm" onClick={() => setClienteParaExcluir(c)}>
                       Excluir
                     </button>
                   </td>
@@ -137,6 +154,17 @@ export default function Clientes() {
           </tbody>
         </table>
       </div>
+
+      {clienteParaExcluir && (
+        <ConfirmDialog
+          titulo="Excluir cliente"
+          mensagem={`Tem certeza que deseja excluir "${clienteParaExcluir.nome}"? Esta ação não pode ser desfeita. Se o cliente tiver faturas vinculadas, a exclusão será bloqueada pelo sistema.`}
+          textoConfirmar="Excluir definitivamente"
+          aoConfirmar={handleDelete}
+          aoCancelar={() => setClienteParaExcluir(null)}
+          processando={excluindo}
+        />
+      )}
 
       {showModal && (
         <div className="modal-overlay">
@@ -221,6 +249,17 @@ export default function Clientes() {
                     onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
                   />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.notificacoes_ativas}
+                    onChange={(e) => setFormData({ ...formData, notificacoes_ativas: e.target.checked })}
+                  />
+                  Enviar lembretes automáticos de vencimento a este cliente
+                </label>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>

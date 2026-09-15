@@ -16,4 +16,8 @@ export default defineConfig({
       },
     },
   },
+  test: {
+    // Os tests do interceptor de axios precisam de localStorage e XHR.
+    environment: 'jsdom',
+  },
 })

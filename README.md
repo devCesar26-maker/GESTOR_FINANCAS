@@ -119,6 +119,28 @@ python manage.py runserver
 Servidor em http://localhost:8000 — documentação em
 http://localhost:8000/api/schema/swagger-ui/.
 
+### Credenciais de desenvolvimento
+
+O login em `/api/token/` usa o usuário padrão de dev (o mesmo usado pelos
+testes e pelo frontend):
+
+| Campo    | Valor            |
+| -------- | ---------------- |
+| Username | `admin`          |
+| Senha    | `senha-forte-123`|
+
+Ele é criado/restaurado automaticamente pelo `backend/scripts/ensure_dev_superuser.py`
+(ao subir via Docker) ou manualmente com:
+
+```bash
+cd backend
+python manage.py shell < scripts/ensure_dev_superuser.py
+```
+
+> Personalize via `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_EMAIL` e
+> `DJANGO_SUPERUSER_PASSWORD`. Em produção, defina-os e **troque a senha**,
+> ou remova o passo do entrypoint.
+
 ### Celery (jobs assíncronos)
 
 Em outro terminal:
@@ -192,6 +214,65 @@ DB_ENGINE=django.db.backends.postgresql \
 DB_NAME=finflow DB_USER=finflow DB_PASSWORD=finflow DB_HOST=localhost \
 pytest
 ```
+
+---
+
+## Segurança (hardening)
+
+Auditoria por categoria de ataque + correções + testes automatizados:
+
+- `backend/tests/test_seguridad.py` — um teste por categoria (backend)
+- `frontend/src/xss_escape.test.jsx` — escape XSS do React (frontend)
+
+| Categoria          | Estado                                                                                        |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| SQL Injection      | ORM parametrizado (sem `.raw()`/`.extra()`/cursor manual) — tests com payloads clássicos      |
+| XSS                | React escapa por padrão; sem `dangerouslySetInnerHTML` — tests de armazenamento literal       |
+| CSRF               | Auth por header `Authorization` (JWT), sem cookies → risco baixo por natureza                 |
+| Command Injection  | Sem `os.system`/`subprocess`/`shell=True` — sem superfície de ataque                          |
+| Clickjacking       | `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'` — test de headers                      |
+| Token Hijacking    | Tokens em `localStorage` (trade-off abaixo); HTTPS obrigatório em produção                    |
+| Rate Limiting      | Throttling DRF: anon 20/min, user 100/min; login/registro 5/min por IP — test 429             |
+| Payload / DDoS     | Limite de payload 1 MB (413) + `DATA_UPLOAD_MAX_MEMORY_SIZE`; DDoS real exige infraestrutura  |
+
+### HTTPS obrigatório em produção
+
+Com `DEBUG=False` (produção), `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`
+e `CSRF_COOKIE_SECURE` são `True` por padrão (override explícito via
+variáveis de ambiente). O docker-compose de desenvolvimento define
+`DEBUG=true` explicitamente, mantendo HTTP local.
+
+### Rate limiting
+
+- Global: `anon` 20 req/min, `user` 100 req/min (`AnonRateThrottle`/`UserRateThrottle`).
+- Login (`/api/token/`) e registro (`/api/auth/registro/`): **5 tentativas por
+  minuto por IP** (`ScopedRateThrottle`) — mitiga força bruta de senha e
+  criação de contas em massa.
+
+### Limites de payload e DDoS
+
+- `MAX_BODY_SIZE_BYTES` (padrão 1 MB) → 413 para payloads maiores
+  (middleware `MaxBodySizeMiddleware`).
+- **Proteção completa contra DDoS NÃO é responsabilidade do código Django**:
+  exige camada de infraestrutura (ex.: Cloudflare/WAF + CDN) na frente do
+  domínio em produção. Este projeto mitiga a nível de aplicação (throttling
+  + payload); não afirma estar "protegido contra DDoS" sem essa camada.
+
+### Armazenamento de tokens (decisão de arquitetura)
+
+Os tokens JWT vivem em `localStorage` (accesível via JavaScript → vulnerável
+a XSS; contrapartida: não há superfície XSS conhecida no projeto). Alternativas
+e trade-off na seção de trabalho correspondente; a decisão de mudar a
+esTrategia de armazenamento é do gestor do projeto, não um bugfix.
+
+### Limitações conhecidas
+
+- CSP mínima (só `frame-ancestors`): uma CSP completa (`style-src`/`script-src`)
+  rompe o frontend, que usa estilos inline.
+- Limite de payload depende do header `Content-Length`;
+  `transfer-encoding: chunked` exige limite no proxy (nginx).
+- MITM e DDoS não são testables via pytest — se mitigam com infraestrutura
+  (HTTPS/HSTS, WAF/CDN), não com lógica de aplicação.
 
 ---
 

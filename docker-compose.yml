@@ -28,6 +28,8 @@ services:
   backend:
     build: ./backend
     command: ./entrypoint.sh gunicorn finflow.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    env_file:
+      - ./backend/.env
     environment:
       SECRET_KEY: dev-secret-nao-para-producao
       DEBUG: "true"
@@ -40,7 +42,12 @@ services:
       DB_PORT: "5432"
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      REDIS_URL: redis://redis:6379/1
       CORS_ALLOWED_ORIGINS: http://localhost:5173
+      CSRF_TRUSTED_ORIGINS: http://localhost:5173
+      DJANGO_SUPERUSER_USERNAME: admin
+      DJANGO_SUPERUSER_EMAIL: admin@finflow.com
+      DJANGO_SUPERUSER_PASSWORD: senha-forte-123
     volumes:
       - ./backend:/app
     ports:
@@ -54,6 +61,8 @@ services:
   worker:
     build: ./backend
     command: celery -A finflow worker -l info
+    env_file:
+      - ./backend/.env
     environment:
       SECRET_KEY: dev-secret-nao-para-producao
       DEBUG: "true"
@@ -74,6 +83,31 @@ services:
         condition: service_healthy
       backend:
         condition: service_started
+
+  beat:
+    build: ./backend
+    command: celery -A finflow beat -l info
+    env_file:
+      - ./backend/.env
+    environment:
+      # mesmas variáveis do worker
+      SECRET_KEY: dev-secret-nao-para-producao
+      DEBUG: "true"
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: FINANCEIRO
+      DB_USER: postgres
+      DB_PASSWORD: CESAR26
+      DB_HOST: db
+      DB_PORT: "5432"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   frontend:
     build: ./frontend

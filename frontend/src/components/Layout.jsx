@@ -1,11 +1,19 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
+import api, { clearAccessToken } from '../api/client'
 
 export default function Layout({ children }) {
   const navigate = useNavigate()
 
-  const handleLogout = () => {
-    localStorage.removeItem('finflow_access')
-    localStorage.removeItem('finflow_refresh')
+  const handleLogout = async () => {
+    // Avisa o backend para limpar o cookie httpOnly do refresh token;
+    // depois limpa o access token local e volta ao login. Se a chamada
+    // falhar (ex: sessão já morta), o logout local segue do mesmo jeito.
+    try {
+      await api.post('/token/logout/')
+    } catch {
+      /* noop */
+    }
+    clearAccessToken()
     navigate('/login')
   }
 

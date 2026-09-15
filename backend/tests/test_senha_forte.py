@@ -54,10 +54,14 @@ def test_login_nao_revalida_forca_de_senha(api_client, django_user_model):
         email="antigo@finflow.com",
         password="senha-antiga-fraca",  # não cumpre a política atual
     )
+    # O login exige duplo envio CSRF desde que o refresh viaja num cookie.
+    api_client.get("/api/csrf/")
+    csrf = api_client.cookies["csrftoken"].value
     response = api_client.post(
         TOKEN_URL,
         {"username": "antigo@finflow.com", "password": "senha-antiga-fraca"},
         format="json",
+        HTTP_X_CSRFTOKEN=csrf,
     )
     assert response.status_code == status.HTTP_200_OK
     assert "access" in response.data

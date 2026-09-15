@@ -18,6 +18,22 @@ DATABASES = {
 # Nunca envia e-mail de verdade nos testes; captura em django.core.mail.outbox.
 EMAIL_BACKEND = "anymail.backends.test.EmailBackend"
 
+# HTTPS é assunto de produção: nos testes tudo corre por http (o test
+# client não usa https por padrão e SECURE_SSL_REDIRECT rompería tudo).
+SECURE_SSL_REDIRECT = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+REFRESH_COOKIE_SECURE = False
+
+# Throttling: en prod usa Redis (ver settings.CACHES); en tests, cache em
+# memoria — rápido e sem depender de um Redis local. O conftest limpa o
+# cache entre testes para que os rate limits não vazem entre testes.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
+}
+
 # Tasks Celery rodam inline (eager): .delay() executa na hora, sem broker/worker,
 # permitindo assertar os e-mails enviados via fixture mailoutbox do pytest-django.
 CELERY_TASK_ALWAYS_EAGER = True

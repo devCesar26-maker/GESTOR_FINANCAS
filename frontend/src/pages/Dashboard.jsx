@@ -171,16 +171,16 @@ export default function Dashboard() {
                   <YAxis stroke="#94a3b8" tickLine={false} axisLine={{ stroke: '#334155' }} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#1e293b',
-                      borderColor: '#334155',
-                      borderRadius: '8px',
-                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)',
-                      color: '#f8fafc',
+                      backgroundColor: '#101d20',
+                      borderColor: '#24393e',
+                      borderRadius: '2px',
+                      border: '1px solid #24393e',
+                      color: '#ecf1ef',
                     }}
                   />
                   <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                  <Bar dataKey="Entradas" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={55} />
-                  <Bar dataKey="Saídas" fill="#ef4444" radius={[6, 6, 0, 0]} maxBarSize={55} />
+                  <Bar dataKey="Entradas" fill="#10b981" radius={[2, 2, 0, 0]} maxBarSize={55} />
+                  <Bar dataKey="Saídas" fill="#ef4444" radius={[2, 2, 0, 0]} maxBarSize={55} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

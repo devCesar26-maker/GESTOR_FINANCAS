@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import api from '../api/client'
 import Layout from '../components/Layout'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Faturas() {
   const [faturas, setFaturas] = useState([])
@@ -10,6 +11,10 @@ export default function Faturas() {
   const [pageError, setPageError] = useState('')
   const [modalError, setModalError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  // Modal de confirmação de cancelamento (substitui window.confirm nativo).
+  const [faturaParaCancelar, setFaturaParaCancelar] = useState(null)
+  const [cancelando, setCancelando] = useState(false)
 
   const [formData, setFormData] = useState({
     numero: '',
@@ -85,15 +90,20 @@ export default function Faturas() {
     }
   }
 
-  const handleCancelar = async (id) => {
-    if (!window.confirm('Tem certeza que deseja cancelar esta fatura?')) return
+  const handleCancelar = async () => {
+    if (!faturaParaCancelar) return
+    setCancelando(true)
     setPageError('')
     try {
-      await api.post(`/faturas/${id}/cancelar/`)
+      await api.post(`/faturas/${faturaParaCancelar.id}/cancelar/`)
+      setFaturaParaCancelar(null)
       fetchFaturas()
     } catch (err) {
       const msg = err.response?.data?.detail || 'Não foi possível cancelar a fatura.'
       setPageError(msg)
+      setFaturaParaCancelar(null)
+    } finally {
+      setCancelando(false)
     }
   }
 
@@ -144,8 +154,8 @@ export default function Faturas() {
                   <td style={{ fontWeight: 600 }}>{f.numero}</td>
                   <td>{f.cliente_nome || f.cliente}</td>
                   <td>{f.descricao || '—'}</td>
-                  <td>
-                    <span style={{ color: f.tipo === 'a_receber' ? 'var(--accent-success)' : 'var(--accent-danger)', fontWeight: 600 }}>
+                  <td style={{ minWidth: '90px' }}>
+                    <span style={{ color: f.tipo === 'a_receber' ? 'var(--accent-success)' : 'var(--accent-danger)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                       {f.tipo === 'a_receber' ? 'A Receber' : 'A Pagar'}
                     </span>
                   </td>
@@ -158,21 +168,28 @@ export default function Faturas() {
                   </td>
                   <td style={{ textAlign: 'right' }}>
                     {f.status !== 'paga' && f.status !== 'cancelada' && (
-                      <>
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '8px',
+                          alignItems: 'center',
+                          justifyContent: 'flex-end',
+                          flexWrap: 'nowrap',
+                        }}
+                      >
                         <button
                           className="btn btn-success btn-sm"
-                          style={{ marginRight: '0.5rem' }}
                           onClick={() => handlePagar(f.id)}
                         >
-                          Pagar
+                          {f.tipo === 'a_pagar' ? 'Pagar' : 'Registrar Recebimento'}
                         </button>
                         <button
                           className="btn btn-danger btn-sm"
-                          onClick={() => handleCancelar(f.id)}
+                          onClick={() => setFaturaParaCancelar(f)}
                         >
                           Cancelar
                         </button>
-                      </>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -181,6 +198,17 @@ export default function Faturas() {
           </tbody>
         </table>
       </div>
+
+      {faturaParaCancelar && (
+        <ConfirmDialog
+          titulo="Cancelar fatura"
+          mensagem={`A fatura ${faturaParaCancelar.numero} ficará com status Cancelada permanentemente e não poderá ser reativada. Deseja continuar?`}
+          textoConfirmar="Cancelar fatura"
+          aoConfirmar={handleCancelar}
+          aoCancelar={() => setFaturaParaCancelar(null)}
+          processando={cancelando}
+        />
+      )}
 
       {showModal && (
         <div className="modal-overlay">
