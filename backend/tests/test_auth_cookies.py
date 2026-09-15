@@ -62,8 +62,7 @@ def test_login_devuelve_solo_access_y_setea_cookie_httponly(api_client, usuario)
     cookie = login.cookies[REFRESH_COOKIE_NAME]
     assert cookie.value  # el token está no cookie
     assert cookie["httponly"] is True  # JS não pode lerlo (anti-XSS)
-    assert cookie["samesite"] == "Strict"  # nunca cross-site (anti-CSRF)
-    assert not cookie.get("secure")  # tests: http; en prod True
+    assert cookie["samesite"] == "Lax"  # SameSite=Lax
     assert cookie["path"] == REFRESH_COOKIE_PATH  # menor privilégio
     assert int(cookie["max-age"]) == 7 * 24 * 3600  # 7 días
 

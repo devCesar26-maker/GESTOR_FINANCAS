@@ -39,9 +39,9 @@ def _set_refresh_cookie(response, refresh_token):
         refresh_token,
         max_age=REFRESH_COOKIE_MAX_AGE,
         path=REFRESH_COOKIE_PATH,
-        httponly=True,  # JS não pode lerlo: um XSS não rouba o refresh token
-        secure=settings.REFRESH_COOKIE_SECURE,
-        samesite="Strict",  # nunca viaja em requisições cross-site (CSRF)
+        httponly=True,
+        secure=True,
+        samesite="Lax",
     )
 
 
@@ -138,8 +138,7 @@ class TokenRefreshCookieView(TokenRefreshView):
         # Se ROTATE_REFRESH_TOKENS estivesse ativo, o novo refresh chega na
         # resposta — renovamos também o cookie.
         novo_refresh = serializer.validated_data.pop("refresh", None)
-        if novo_refresh:
-            _set_refresh_cookie(response, novo_refresh)
+        _set_refresh_cookie(response, novo_refresh or refresh)
         return response
 
 

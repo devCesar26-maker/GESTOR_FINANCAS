@@ -65,6 +65,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "finflow.middleware.MaxBodySizeMiddleware",
     "finflow.middleware.CSPFrameAncestorsMiddleware",
+    "finflow.middleware.ServerHeaderMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -196,7 +197,7 @@ else:
 
 ANYMAIL = {"BREVO_API_KEY": BREVO_API_KEY}
 DEFAULT_FROM_EMAIL = os.getenv(
-    "DEFAULT_FROM_EMAIL", "FinFlow <nao-responda@finflow.local>"
+    "DEFAULT_FROM_EMAIL", "FinFlow <projetodefinancas34@gmail.com>"
 )
 
 # Lembrete: grafia "LEMRETE" mantida conforme especificação do projeto.
@@ -273,6 +274,16 @@ SECURE_HSTS_PRELOAD = True
 # refresh token SÍ é httpOnly (ver apps.usuarios.views).
 CSRF_COOKIE_HTTPONLY = False
 SESSION_COOKIE_HTTPONLY = True
+
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; "
+    "font-src 'self'; "
+    "object-src 'none'; "
+    "frame-ancestors 'none';"
+)
 
 # HTTPS obrigatório em produção: por padrão ativo quando DEBUG=False
 # (docker-compose de dev define DEBUG=true explicitamente). Override
