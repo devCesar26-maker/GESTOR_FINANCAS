@@ -50,6 +50,7 @@ services:
       DJANGO_SUPERUSER_PASSWORD: senha-forte-123
     volumes:
       - ./backend:/app
+      - media_files:/app/media
     ports:
       - "8000:8000"
     depends_on:
@@ -123,3 +124,4 @@ services:
 
 volumes:
   pgdata:
+  media_files:

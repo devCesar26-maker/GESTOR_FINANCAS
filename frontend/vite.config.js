@@ -14,6 +14,11 @@ export default defineConfig({
         target: process.env.VITE_PROXY_TARGET || 'http://localhost:8000',
         changeOrigin: true,
       },
+      // Comprovantes de pagamento servidos pelo backend (MEDIA_URL=/media/).
+      '/media': {
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:8000',
+        changeOrigin: true,
+      },
     },
   },
   test: {

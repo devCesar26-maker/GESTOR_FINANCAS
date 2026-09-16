@@ -38,3 +38,9 @@ CACHES = {
 # permitindo assertar os e-mails enviados via fixture mailoutbox do pytest-django.
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = False
+
+# Uploads (comprovantes) nos testes: grava em diretório temporário e limpa
+# ao final da sessão — nada de media/ poluído no repositório.
+import tempfile as _tempfile
+
+MEDIA_ROOT = _tempfile.mkdtemp(prefix="finflow-test-media-")

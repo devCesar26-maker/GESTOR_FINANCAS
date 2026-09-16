@@ -3,6 +3,9 @@ import api from '../api/client'
 import Layout from '../components/Layout'
 import ConfirmDialog from '../components/ConfirmDialog'
 
+const MAX_COMPROVANTE_BYTES = 5 * 1024 * 1024 // 5 MB (mesma regra do backend)
+const TIPOS_COMPROVANTE = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+
 export default function Faturas() {
   const [faturas, setFaturas] = useState([])
   const [clientes, setClientes] = useState([])
@@ -15,6 +18,12 @@ export default function Faturas() {
   // Modal de confirmação de cancelamento (substitui window.confirm nativo).
   const [faturaParaCancelar, setFaturaParaCancelar] = useState(null)
   const [cancelando, setCancelando] = useState(false)
+
+  // Modal de pagamento com COMPROVANTE OBRIGATÓRIO.
+  const [faturaParaPagar, setFaturaParaPagar] = useState(null)
+  const [comprovante, setComprovante] = useState(null)
+  const [pagamentoError, setPagamentoError] = useState('')
+  const [pagando, setPagando] = useState(false)
 
   const [formData, setFormData] = useState({
     numero: '',
@@ -79,14 +88,62 @@ export default function Faturas() {
     }
   }
 
-  const handlePagar = async (id) => {
+  const abrirModalPagar = (fatura) => {
+    setFaturaParaPagar(fatura)
+    setComprovante(null)
+    setPagamentoError('')
+  }
+
+  const validarComprovante = (arquivo) => {
+    if (!arquivo) return 'O comprovante de pagamento é obrigatório.'
+    if (arquivo.size > MAX_COMPROVANTE_BYTES) return 'O arquivo excede o tamanho máximo de 5 MB.'
+    if (arquivo.type && !TIPOS_COMPROVANTE.includes(arquivo.type)) {
+      return 'Tipo de arquivo não permitido. Envie um PDF, JPEG, PNG ou WEBP.'
+    }
+    return ''
+  }
+
+  const handleSelecionarComprovante = (e) => {
+    const arquivo = e.target.files?.[0] || null
+    setComprovante(arquivo)
+    setPagamentoError(arquivo ? validarComprovante(arquivo) : '')
+  }
+
+  const handlePagar = async (e) => {
+    e.preventDefault()
+    if (!faturaParaPagar) return
+
+    // Impede a submissão sem arquivo — o comprovante é OBRIGATÓRIO.
+    const erro = validarComprovante(comprovante)
+    if (erro) {
+      setPagamentoError(erro)
+      return
+    }
+
+    setPagando(true)
+    setPagamentoError('')
     setPageError('')
     try {
-      await api.post(`/faturas/${id}/pagar/`)
+      // Upload via multipart/form-data (FormData) — o backend espera o
+      // campo "comprovante" em request.FILES.
+      const payload = new FormData()
+      payload.append('comprovante', comprovante)
+      await api.post(`/faturas/${faturaParaPagar.id}/pagar/`, payload)
+      setFaturaParaPagar(null)
+      setComprovante(null)
       fetchFaturas()
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Não foi possível pagar a fatura.'
-      setPageError(msg)
+      console.error(err)
+      const data = err.response?.data
+      let msg = 'Não foi possível pagar a fatura.'
+      if (data?.comprovante) {
+        msg = Array.isArray(data.comprovante) ? data.comprovante[0] : String(data.comprovante)
+      } else if (typeof data?.detail === 'string') {
+        msg = data.detail
+      }
+      setPagamentoError(msg)
+    } finally {
+      setPagando(false)
     }
   }
 
@@ -151,7 +208,20 @@ export default function Faturas() {
             ) : (
               faturas.map((f) => (
                 <tr key={f.id}>
-                  <td style={{ fontWeight: 600 }}>{f.numero}</td>
+                  <td style={{ fontWeight: 600 }}>
+                    {f.numero}
+                    {f.comprovante_url && (
+                      <a
+                        href={f.comprovante_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Ver comprovante de pagamento"
+                        style={{ marginLeft: '6px', textDecoration: 'none' }}
+                      >
+                        📎
+                      </a>
+                    )}
+                  </td>
                   <td>{f.cliente_nome || f.cliente}</td>
                   <td>{f.descricao || '—'}</td>
                   <td style={{ minWidth: '90px' }}>
@@ -179,7 +249,7 @@ export default function Faturas() {
                       >
                         <button
                           className="btn btn-success btn-sm"
-                          onClick={() => handlePagar(f.id)}
+                          onClick={() => abrirModalPagar(f)}
                         >
                           {f.tipo === 'a_pagar' ? 'Pagar' : 'Registrar Recebimento'}
                         </button>
@@ -208,6 +278,71 @@ export default function Faturas() {
           aoCancelar={() => setFaturaParaCancelar(null)}
           processando={cancelando}
         />
+      )}
+
+      {faturaParaPagar && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Registrar pagamento">
+          <div className="modal-card" style={{ maxWidth: 480 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">
+                {faturaParaPagar.tipo === 'a_pagar' ? 'Pagar fatura' : 'Registrar recebimento'}
+              </h3>
+              <button
+                className="btn-logout"
+                onClick={() => setFaturaParaPagar(null)}
+                disabled={pagando}
+                aria-label="Fechar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6, marginBottom: '1rem' }}>
+              Fatura <strong>{faturaParaPagar.numero}</strong> —{' '}
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(faturaParaPagar.valor)}
+            </p>
+
+            {pagamentoError && (
+              <div className="alert-error" style={{ marginBottom: '1rem' }}>
+                {pagamentoError}
+              </div>
+            )}
+
+            <form onSubmit={handlePagar} noValidate>
+              <div className="form-group">
+                <label className="form-label" htmlFor="comprovante-input">
+                  Comprovante de pagamento (obrigatório) *
+                </label>
+                <input
+                  id="comprovante-input"
+                  type="file"
+                  className="form-input"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                  required
+                  onChange={handleSelecionarComprovante}
+                  disabled={pagando}
+                />
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                  Formatos aceitos: PDF, JPEG, PNG ou WEBP — até 5 MB.
+                </small>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-logout"
+                  onClick={() => setFaturaParaPagar(null)}
+                  disabled={pagando}
+                >
+                  Voltar
+                </button>
+                <button type="submit" className="btn btn-success" disabled={pagando}>
+                  {pagando ? 'Registrando...' : 'Confirmar pagamento'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {showModal && (

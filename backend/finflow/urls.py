@@ -4,8 +4,10 @@ Rotas raiz do projeto FinFlow.
 Rotas de API por app são incluídas via apps.<app>.urls — cada app declara
 apenas suas próprias rotas, mantendo o roteamento descentralizado.
 """
+from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
+from django.conf.urls.static import static
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
@@ -49,3 +51,8 @@ urlpatterns = [
     path("api/", include("apps.faturamento.urls")),
     path("api/relatorios/", include("apps.relatorios.urls")),
 ]
+
+# Servindo de arquivos de mídia (comprovantes) apenas em DEBUG. Em
+# produção o nginx/servidor web deve servir MEDIA_URL diretamente.
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

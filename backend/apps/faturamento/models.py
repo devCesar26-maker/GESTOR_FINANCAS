@@ -63,6 +63,15 @@ class Fatura(models.Model):
     data_pagamento = models.DateTimeField(
         "data de pagamento", blank=True, null=True
     )
+    # Comprovante de pagamento (OBRIGATÓRIO no ato de pagar — validado na
+    # view/action `pagar`, não aqui, para não quebrar faturas antigas).
+    # Aceito apenas PDF/JPEG/PNG/WEBP com até 5MB (ver services._validar_arquivo).
+    comprovante = models.FileField(
+        "comprovante",
+        upload_to="comprovantes/%Y/%m/",
+        blank=True,
+        null=True,
+    )
     # Controle de idempotência dos lembretes de vencimento (Fase 3):
     # gravados após o envio; None = lembrete ainda não enviado.
     lembrete_previo_enviado_em = models.DateTimeField(

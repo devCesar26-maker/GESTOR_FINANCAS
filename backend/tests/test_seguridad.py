@@ -37,6 +37,7 @@ def payload_cliente(**kwargs):
         "papel": Papel.CLIENTE,
         "tipo_pessoa": TipoPessoa.FISICA,
         "documento": CPF_VALIDO,
+        "email": "maria@example.com",
         "ativo": True,
     }
     dados.update(kwargs)
@@ -88,14 +89,13 @@ def test_sqli_en_nome_de_creacion_se_guarda_como_texto_literal(auth_client):
 
 
 @pytest.mark.django_db
-def test_xss_nome_cliente_se_guarda_como_texto_literal(auth_client):
-    """Nome com <script> via API: se guarda literal, nunca se interpreta.
+def test_xss_nome_cliente_e_sanitizado_na_entrada(auth_client):
+    """Nome com <script> via API: tags são REMOVIDAS na entrada (strip).
 
-    Auditoria: o frontend React escapa por padrão (sem
-    dangerouslySetInnerHTML no projeto) e os serializers não fazem escape
-    manual — guardamos texto puro e a resposta JSON o devolve como
-    string (JSON não executa HTML). O teste de renderizado no frontend
-    está em frontend/src/xss_escape.test.jsx.
+    Auditoria: o frontend React escapa por padrão e os serializers agora
+    fazem strip de tags HTML na entrada (_strip_tags com html.unescape +
+    regex). Texto residual é guardado literal; JSON nunca executa HTML.
+    Teste de render no frontend: frontend/src/xss_escape.test.jsx.
     """
     response = auth_client.post(
         CLIENTES_URL, payload_cliente(nome=PAYLOAD_XSS), format="json"
@@ -103,12 +103,13 @@ def test_xss_nome_cliente_se_guarda_como_texto_literal(auth_client):
 
     assert response.status_code == status.HTTP_201_CREATED
     cliente = Cliente.objects.get(pk=response.data["id"])
-    assert cliente.nome == PAYLOAD_XSS  # literal, igual ao enviado
-    assert response.data["nome"] == PAYLOAD_XSS
+    assert cliente.nome == "alert(1)"  # tags removidas, texto residual
+    assert response.data["nome"] == "alert(1)"
+    assert "<" not in cliente.nome and ">" not in cliente.nome
 
 
 @pytest.mark.django_db
-def test_xss_descricao_fatura_se_guarda_como_texto_literal(auth_client, user):
+def test_xss_descricao_fatura_e_sanitizada_na_entrada(auth_client, user):
     cliente = Cliente.objects.create(
         nome="Ana", tipo_pessoa=TipoPessoa.FISICA, owner=user
     )
@@ -128,7 +129,8 @@ def test_xss_descricao_fatura_se_guarda_como_texto_literal(auth_client, user):
 
     assert response.status_code == status.HTTP_201_CREATED
     fatura = Fatura.objects.get(pk=response.data["id"])
-    assert fatura.descricao == PAYLOAD_XSS
+    assert fatura.descricao == "alert(1)"  # tags removidas
+    assert "<" not in fatura.descricao and ">" not in fatura.descricao
 
 
 # ---------------------------------------------------------------------------

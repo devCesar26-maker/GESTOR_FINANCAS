@@ -13,18 +13,30 @@ class MaxBodySizeMiddleware:
 
     Aplica-se ao caso JSON (a API do FinFlow é JSON puro): o Django só
     limita por padrão multipart/form-data (DATA_UPLOAD_MAX_MEMORY_SIZE),
-    não corpos JSON.
+    não corpos JSON. Requisições multipart/form-data (upload de comprovante)
+    têm limite próprio, maior: COMPROVANTE_MAX_BYTES.
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
         self.max_size = getattr(settings, "MAX_BODY_SIZE_BYTES", 1024 * 1024)
+        # Uploads multipart (comprovante PDF/imagem) têm limite próprio,
+        # maior: COMPROVANTE_MAX_BYTES + margem para o overhead do próprio
+        # multipart/form-data (fronteira entre campos, headers de parte).
+        # O limite EXATO do arquivo (5 MB) é validado na view — aqui passam
+        # requests cujo ARQUIVO caiba no limite.
+        self.max_multipart_size = getattr(
+            settings, "COMPROVANTE_MAX_BYTES", 5 * 1024 * 1024
+        ) + 64 * 1024
 
     def __call__(self, request):
         if request.method in ("POST", "PUT", "PATCH"):
+            content_type = request.content_type or ""
+            is_multipart = content_type.startswith("multipart/form-data")
+            limite = self.max_multipart_size if is_multipart else self.max_size
             content_length = request.META.get("CONTENT_LENGTH")
             if content_length and content_length.isdigit():
-                if int(content_length) > self.max_size:
+                if int(content_length) > limite:
                     return HttpResponse(
                         "Payload excede o limite permitido.",
                         status=413,

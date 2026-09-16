@@ -1,9 +1,31 @@
 """Camada de serializers do app Clientes."""
+import html
 import re
+
 from rest_framework import serializers
 
 from .models import Cliente, TipoPessoa
 from .validators import validar_cnpj, validar_cpf
+
+
+def _strip_tags(valor):
+    """Remove tags HTML de uma string (mitigação de XSS).
+
+    Usa apenas a stdlib: html.unescape decodifica entidades (&lt;b&gt; -> <b>)
+    e o regex remove qualquer marcação <...>, repetindo até não restarem
+    tags (ex.: "&lt;scri<b>pt&gt;" viraria "<script>" após uma passada única).
+    No fim, normaliza espaços e colapsa whitespace.
+    """
+    if not isinstance(valor, str):
+        return valor
+    texto = html.unescape(valor)
+    padrao_tag = re.compile(r"<[^>]*>")
+    while True:
+        novo = padrao_tag.sub("", texto)
+        if novo == texto:
+            break
+        texto = html.unescape(novo)
+    return re.sub(r"\s+", " ", texto).strip()
 
 
 class ClienteSerializer(serializers.ModelSerializer):
@@ -26,11 +48,36 @@ class ClienteSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = ("id", "created_at", "updated_at")
+        extra_kwargs = {
+            # Regra de negócio: documento e e-mail são OBRIGATÓRIOS;
+            # telefone permanece opcional.
+            "documento": {"required": True, "allow_null": False},
+            "email": {"required": True, "allow_blank": False},
+        }
+
+    # Campos de texto livres que recebem strip de tags HTML na entrada.
+    CAMPOS_TEXTO_SANITIZADOS = ("nome", "documento", "email", "telefone", "endereco")
+
+    def to_internal_value(self, data):
+        """Sanitiza a ENTRADA antes da validação por campo.
+
+        Assim o e-mail, por exemplo, já chega limpo de tags ao EmailField —
+        "<b>maria</b>@ex.com" é validado como "maria@ex.com", e não rejeitado
+        por conter marcação.
+        """
+        if hasattr(data, "items"):
+            dados = dict(data)
+            for campo in self.CAMPOS_TEXTO_SANITIZADOS:
+                valor = dados.get(campo)
+                if isinstance(valor, str):
+                    dados[campo] = _strip_tags(valor)
+            data = dados
+        return super().to_internal_value(data)
 
     def validate_documento(self, value):
         value = (value or "").strip() or None
         if value is None:
-            return value
+            raise serializers.ValidationError("O documento (CPF/CNPJ) é obrigatório.")
         # Multi-tenancy: a duplicidade de documento vale apenas dentro do
         # cadastro do próprio gestor (owner). A mesma pessoa/empresa pode ser
         # cliente de vários gestores ao mesmo tempo.
@@ -70,6 +117,15 @@ class ClienteSerializer(serializers.ModelSerializer):
                         )
                     }
                 )
+
+        # Sanitização já feita em to_internal_value (antes da validação);
+        # aqui apenas a regra de negócio do nome vazio.
+        nome = attrs.get("nome")
+        if nome is not None and not nome.strip():
+            raise serializers.ValidationError(
+                {"nome": "O nome não pode ser vazio ou conter apenas espaços."}
+            )
+
         return attrs
 
 

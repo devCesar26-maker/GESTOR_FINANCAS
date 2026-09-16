@@ -28,6 +28,7 @@ def payload_cliente(**overrides):
         "nome": "Empresa Exemplo Ltda",
         "papel": "cliente",
         "tipo_pessoa": "pj",
+        "documento": "11.222.333/0001-81",
         "email": EMAIL_CLIENTE,
     }
     payload.update(overrides)
@@ -81,12 +82,14 @@ def test_falha_no_envio_nao_impede_criacao_do_cliente(auth_client, user, mailout
 
 
 @pytest.mark.django_db
-def test_cliente_sem_email_nao_dispara_notificacao(auth_client, mailoutbox):
+def test_cliente_sem_email_e_rejeitado_pela_regra_de_negocio(auth_client, mailoutbox):
+    """Regra nova: e-mail é OBRIGATÓRIO no cadastro de cliente/fornecedor."""
     response = auth_client.post(
         CLIENTES_URL, payload_cliente(email=""), format="json"
     )
 
-    assert response.status_code == status.HTTP_201_CREATED
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "email" in response.data
     assert len(mailoutbox) == 0
 
 

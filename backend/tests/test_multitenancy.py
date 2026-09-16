@@ -203,7 +203,16 @@ def test_detail_fatura_de_outro_usuario_retorna_404(client_a, fatura_b):
 
 @pytest.mark.django_db
 def test_action_pagar_fatura_de_outro_usuario_retorna_404(client_a, fatura_b):
-    response = client_a.post(f"{FATURAS_URL}{fatura_b.id}/pagar/")
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    comprovante = SimpleUploadedFile(
+        "comprovante.pdf", b"%PDF-1.4 x", content_type="application/pdf"
+    )
+    response = client_a.post(
+        f"{FATURAS_URL}{fatura_b.id}/pagar/",
+        {"comprovante": comprovante},
+        format="multipart",
+    )
     assert response.status_code == status.HTTP_404_NOT_FOUND
     fatura_b.refresh_from_db()
     assert fatura_b.status == StatusFatura.PENDENTE
@@ -258,6 +267,8 @@ def test_owner_do_payload_e_ignorado_na_criacao_de_cliente(
             "nome": "Cliente Injetado",
             "papel": Papel.CLIENTE,
             "tipo_pessoa": TipoPessoa.FISICA,
+            "documento": CPF_A,
+            "email": "injetado@finflow.com",
             "owner": user_b.id,
         },
         format="json",
@@ -421,6 +432,7 @@ def payload_documento(**overrides):
         "papel": Papel.CLIENTE,
         "tipo_pessoa": TipoPessoa.FISICA,
         "documento": CPF_A,
+        "email": "pessoa@example.com",
     }
     payload.update(overrides)
     return payload
@@ -465,7 +477,9 @@ def test_mesmo_owner_nao_pode_cadastrar_documento_duplicado(client_a):
 def test_edicao_pode_manter_documento_do_proprio_owner(client_a, cliente_a):
     """Editar outro atributo do próprio cliente não esbarra na unicidade."""
     response = client_a.patch(
-        f"{CLIENTES_URL}{cliente_a.id}/", {"telefone": "1199999-9999"}, format="json"
+        f"{CLIENTES_URL}{cliente_a.id}/",
+        {"telefone": "1199999-9999", "email": "contato@cliente-a.com"},
+        format="json",
     )
     assert response.status_code == status.HTTP_200_OK
     assert response.data["telefone"] == "1199999-9999"

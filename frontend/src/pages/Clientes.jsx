@@ -15,6 +15,9 @@ export default function Clientes() {
   const [clienteParaExcluir, setClienteParaExcluir] = useState(null)
   const [excluindo, setExcluindo] = useState(false)
 
+  // Erros de validação inline, por campo (exibidos sob cada input).
+  const [fieldErrors, setFieldErrors] = useState({})
+
   const [formData, setFormData] = useState({
     nome: '',
     papel: 'cliente',
@@ -42,9 +45,51 @@ export default function Clientes() {
     }
   }
 
+  // -----------------------------------------------------------------------
+  // Validação inline (antes do submit) — mensagens legíveis por campo.
+  // Regras de negócio: documento e e-mail OBRIGATÓRIOS; telefone opcional.
+  // -----------------------------------------------------------------------
+  const validarFormulario = () => {
+    const erros = {}
+
+    if (!formData.nome.trim()) {
+      erros.nome = 'O nome é obrigatório.'
+    }
+
+    if (!formData.documento.trim()) {
+      erros.documento =
+        formData.tipo_pessoa === 'pf'
+          ? 'O CPF é obrigatório.'
+          : 'O CNPJ é obrigatório.'
+    } else if (formData.tipo_pessoa === 'pf') {
+      const digitos = formData.documento.replace(/\D/g, '')
+      if (digitos.length !== 11) {
+        erros.documento = 'CPF inválido: informe os 11 dígitos.'
+      }
+    } else if (formData.tipo_pessoa === 'pj') {
+      const digitos = formData.documento.replace(/\D/g, '')
+      if (digitos.length !== 14) {
+        erros.documento = 'CNPJ inválido: informe os 14 dígitos.'
+      }
+    }
+
+    if (!formData.email.trim()) {
+      erros.email = 'O e-mail é obrigatório.'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      erros.email = 'Informe um e-mail válido (ex.: nome@empresa.com).'
+    }
+
+    return erros
+  }
+
   const handleCreate = async (e) => {
     e.preventDefault()
     setModalError('')
+
+    const erros = validarFormulario()
+    setFieldErrors(erros)
+    if (Object.keys(erros).length > 0) return
+
     setSubmitting(true)
     try {
       await api.post('/clientes/', formData)
@@ -90,6 +135,8 @@ export default function Clientes() {
     }
   }
 
+  const estiloErroCampo = { color: 'var(--accent-danger)', fontSize: '0.8rem', marginTop: '0.25rem' }
+
   return (
     <Layout>
       <div className="page-header">
@@ -97,7 +144,7 @@ export default function Clientes() {
           <h1 className="page-title">Clientes e Fornecedores</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Gestão de cadastros da sua empresa</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setModalError(''); setShowModal(true); }}>
+        <button className="btn btn-primary" onClick={() => { setModalError(''); setFieldErrors({}); setShowModal(true); }}>
           + Novo Cadastro
         </button>
       </div>
@@ -180,9 +227,9 @@ export default function Clientes() {
               </div>
             )}
 
-            <form onSubmit={handleCreate}>
+            <form onSubmit={handleCreate} noValidate>
               <div className="form-group">
-                <label className="form-label">Nome Completo / Razão Social</label>
+                <label className="form-label">Nome Completo / Razão Social *</label>
                 <input
                   type="text"
                   className="form-input"
@@ -190,6 +237,7 @@ export default function Clientes() {
                   value={formData.nome}
                   onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                 />
+                {fieldErrors.nome && <div style={estiloErroCampo}>{fieldErrors.nome}</div>}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -211,7 +259,10 @@ export default function Clientes() {
                   <select
                     className="form-select"
                     value={formData.tipo_pessoa}
-                    onChange={(e) => setFormData({ ...formData, tipo_pessoa: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, tipo_pessoa: e.target.value })
+                      setFieldErrors((prev) => ({ ...prev, documento: undefined }))
+                    }}
                   >
                     <option value="pf">Física (PF)</option>
                     <option value="pj">Jurídica (PJ)</option>
@@ -220,31 +271,37 @@ export default function Clientes() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Documento (CPF / CNPJ)</label>
+                <label className="form-label">Documento (CPF / CNPJ) *</label>
                 <input
                   type="text"
                   className="form-input"
+                  required
                   placeholder={formData.tipo_pessoa === 'pf' ? 'Ex: 123.456.789-09' : 'Ex: 34.357.386/0001-05'}
                   value={formData.documento}
                   onChange={(e) => setFormData({ ...formData, documento: e.target.value })}
                 />
+                {fieldErrors.documento && <div style={estiloErroCampo}>{fieldErrors.documento}</div>}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
-                  <label className="form-label">Email</label>
+                  <label className="form-label">Email *</label>
                   <input
                     type="email"
                     className="form-input"
+                    required
+                    placeholder="ex.: contato@empresa.com"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   />
+                  {fieldErrors.email && <div style={estiloErroCampo}>{fieldErrors.email}</div>}
                 </div>
                 <div className="form-group">
                   <label className="form-label">Telefone</label>
                   <input
                     type="text"
                     className="form-input"
+                    placeholder="Opcional"
                     value={formData.telefone}
                     onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
                   />

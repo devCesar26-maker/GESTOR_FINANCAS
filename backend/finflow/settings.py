@@ -256,6 +256,12 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# Uploads de usuário (comprovantes de pagamento de faturas).
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+# Tamanho máximo de cada comprovante enviado em /api/faturas/{id}/pagar/.
+COMPROVANTE_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ---------------------------------------------------------------------------

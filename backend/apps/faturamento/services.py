@@ -21,8 +21,17 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 
-def pagar_fatura(fatura: Fatura) -> Fatura:
-    """Registra pagamento da fatura se estiver em estado válido."""
+def pagar_fatura(fatura: Fatura, comprovante=None) -> Fatura:
+    """Registra pagamento da fatura se estiver em estado válido.
+
+    O comprovante de pagamento é OBRIGATÓRIO para registrar o pagamento.
+    A exigência é aplicada em duas camadas: a view rejeita requests sem
+    arquivo com 400 (antes de tocar no banco) e este serviço levanta
+    ValueError caso seja chamado sem arquivo — nunca existe fatura paga
+    sem comprovante vinculado.
+    """
+    if comprovante is None:
+        raise ValueError("O comprovante de pagamento é obrigatório.")
     if fatura.status == StatusFatura.PAGA:
         raise FaturaEstadoInvalidoError("A fatura já está paga.")
     if fatura.status == StatusFatura.CANCELADA:
@@ -30,7 +39,10 @@ def pagar_fatura(fatura: Fatura) -> Fatura:
 
     fatura.status = StatusFatura.PAGA
     fatura.data_pagamento = timezone.now()
-    fatura.save(update_fields=["status", "data_pagamento", "updated_at"])
+    fatura.comprovante = comprovante
+    fatura.save(
+        update_fields=["status", "data_pagamento", "comprovante", "updated_at"]
+    )
     return fatura
 
 
