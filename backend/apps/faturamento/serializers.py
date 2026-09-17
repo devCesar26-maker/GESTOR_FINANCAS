@@ -68,6 +68,9 @@ class FaturaSerializer(serializers.ModelSerializer):
     """Serializer do modelo Fatura. Status é strictly read-only."""
 
     cliente_nome = serializers.CharField(source="cliente.nome", read_only=True)
+    cliente_telefone = serializers.CharField(
+        source="cliente.telefone", read_only=True, default=None
+    )
     comprovante = serializers.FileField(read_only=True, required=False, allow_null=True)
     comprovante_url = serializers.SerializerMethodField()
     categoria_nome = serializers.CharField(
@@ -84,6 +87,7 @@ class FaturaSerializer(serializers.ModelSerializer):
             "numero",
             "cliente",
             "cliente_nome",
+            "cliente_telefone",
             "descricao",
             "tipo",
             "valor",

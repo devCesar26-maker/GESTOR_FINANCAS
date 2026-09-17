@@ -2,6 +2,44 @@ import { useEffect, useState } from 'react'
 import api from '../api/client'
 import Layout from '../components/Layout'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { montarLinkWhatsApp } from '../utils/whatsapp'
+import { mascararTelefone } from '../utils/telefone'
+
+// Botão "Conversar no WhatsApp" da linha do cliente.
+// - Com telefone válido: abre https://wa.me/{numero}?text={msg} em nova aba.
+// - Sem telefone (vazio ou só e-mail): desabilitado com tooltip explicativa.
+function BotaoWhatsApp({ cliente }) {
+  const link = montarLinkWhatsApp(cliente.nome, cliente.telefone)
+
+  if (link) {
+    return (
+      <a
+        className="btn btn-success btn-sm"
+        href={link}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Conversar no WhatsApp"
+        style={{ textDecoration: 'none' }}
+      >
+        💬
+      </a>
+    )
+  }
+
+  return (
+    <button
+      className="btn btn-success btn-sm"
+      disabled
+      title={
+        cliente.telefone
+          ? 'Telefone inválido para WhatsApp (use DDD + número, ex.: 11 98765-4321)'
+          : 'Telefone não informado'
+      }
+    >
+      💬
+    </button>
+  )
+}
 
 const FORMULARIO_VAZIO = {
   nome: '',
@@ -261,6 +299,7 @@ export default function Clientes() {
                   </td>
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                      <BotaoWhatsApp cliente={c} />
                       <button
                         className="btn btn-primary btn-sm"
                         onClick={() => abrirModalEdicao(c)}
@@ -385,9 +424,11 @@ export default function Clientes() {
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Opcional"
+                    placeholder="Opcional — ex.: (11) 98765-4321"
                     value={formData.telefone}
-                    onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, telefone: mascararTelefone(e.target.value) })
+                    }
                   />
                 </div>
               </div>

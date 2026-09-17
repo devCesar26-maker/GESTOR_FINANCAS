@@ -2,6 +2,43 @@ import { useEffect, useState } from 'react'
 import api from '../api/client'
 import Layout from '../components/Layout'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { montarLinkCobranca } from '../utils/whatsapp'
+
+// Botão "Cobrar no WhatsApp" para faturas A RECEBER pendentes/vencidas.
+// Abre wa.me com número do cliente e mensagem com número, valor e vencimento.
+// Sem telefone válido no cadastro: botão desabilitado com tooltip.
+function BotaoCobrancaWhatsApp({ fatura }) {
+  const link = montarLinkCobranca(fatura)
+
+  if (link) {
+    return (
+      <a
+        className="btn btn-success btn-sm"
+        href={link}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Cobrar no WhatsApp"
+        style={{ textDecoration: 'none' }}
+      >
+        💬
+      </a>
+    )
+  }
+
+  return (
+    <button
+      className="btn btn-success btn-sm"
+      disabled
+      title={
+        fatura.cliente_telefone
+          ? 'Telefone do cliente inválido para WhatsApp (cadastre DDD + número)'
+          : 'Telefone do cliente não informado'
+      }
+    >
+      💬
+    </button>
+  )
+}
 
 const MAX_COMPROVANTE_BYTES = 5 * 1024 * 1024 // 5 MB (mesma regra do backend)
 const TIPOS_COMPROVANTE = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
@@ -477,6 +514,7 @@ export default function Faturas() {
                       )}
                       {ehEditavel(f) && (
                         <>
+                          {f.tipo === 'a_receber' && <BotaoCobrancaWhatsApp fatura={f} />}
                           <button
                             className="btn btn-success btn-sm"
                             onClick={() => abrirModalPagar(f)}
@@ -499,12 +537,15 @@ export default function Faturas() {
                         </>
                       )}
                       {f.status === 'vencida' && (
-                        <button
-                          className="btn btn-success btn-sm"
-                          onClick={() => abrirModalPagar(f)}
-                        >
-                          {f.tipo === 'a_pagar' ? 'Pagar' : 'Receber'}
-                        </button>
+                        <>
+                          {f.tipo === 'a_receber' && <BotaoCobrancaWhatsApp fatura={f} />}
+                          <button
+                            className="btn btn-success btn-sm"
+                            onClick={() => abrirModalPagar(f)}
+                          >
+                            {f.tipo === 'a_pagar' ? 'Pagar' : 'Receber'}
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>

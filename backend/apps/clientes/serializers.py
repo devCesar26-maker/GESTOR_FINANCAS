@@ -92,6 +92,24 @@ class ClienteSerializer(serializers.ModelSerializer):
             )
         return value
 
+    def validate_telefone(self, value):
+        """Telefone é opcional, mas se informado precisa ser um número BR válido.
+
+        Aceita: DDD + 8 dígitos (fixo, 10 no total) ou DDD + 9 (celular, 11 no
+        total), com ou sem máscara; também aceita 12/13 dígitos começando com
+        o DDI 55. Qualquer outra coisa (e-mail, ramal, número curto) -> 400.
+        """
+        if not value:
+            return value  # opcional: vazio/nulo é permitido
+        digitos = re.sub(r"\D", "", value)
+        tem_ddi_brasil = digitos.startswith("55") and len(digitos) in (12, 13)
+        if not tem_ddi_brasil and len(digitos) not in (10, 11):
+            raise serializers.ValidationError(
+                "Telefone inválido: informe DDD + número (10 ou 11 dígitos), "
+                "ex.: (11) 98765-4321."
+            )
+        return value
+
     def validate(self, attrs):
         documento = attrs.get(
             "documento", self.instance.documento if self.instance else None
