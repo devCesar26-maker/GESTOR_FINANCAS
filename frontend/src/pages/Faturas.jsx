@@ -6,18 +6,56 @@ import ConfirmDialog from '../components/ConfirmDialog'
 const MAX_COMPROVANTE_BYTES = 5 * 1024 * 1024 // 5 MB (mesma regra do backend)
 const TIPOS_COMPROVANTE = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
 
+const FORMULARIO_VAZIO = {
+  numero: '',
+  cliente: '',
+  descricao: '',
+  tipo: 'a_receber',
+  valor: '',
+  vencimento: '',
+  categoria: '',
+}
+
+// Faturas editáveis: apenas pendentes ("A Receber" / "A Pagar"). Pagas,
+// vencidas e canceladas são SOMENTE LEITURA (o backend reforça com 409).
+const ehEditavel = (fatura) => fatura.status === 'pendente'
+
+// Resolve a URL do comprovante: o backend agora devolve o caminho relativo
+// "/media/..." (sem host), evitando hostnames internos do Docker (backend:8000).
+// No dev, o caminho é servido pelo proxy do Vite para o backend; em produção,
+// pelo mesmo domínio (Nginx). Se um dia vier uma URL absoluta, mantemos como está.
+const urlComprovante = (url) =>
+  !url || /^https?:\/\//i.test(url) ? url : `/media/${String(url).replace(/^\/+/, '').replace(/^media\//, '')}`
+
 export default function Faturas() {
   const [faturas, setFaturas] = useState([])
   const [clientes, setClientes] = useState([])
+  const [categorias, setCategorias] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [pageError, setPageError] = useState('')
   const [modalError, setModalError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  // Filtros avançados (aplicados server-side via django-filter/ORM).
+  const [filtros, setFiltros] = useState({
+    status: '',
+    tipo: '',
+    vencimento_apos: '',
+    vencimento_ate: '',
+    busca: '',
+  })
+
+  // Edição: fatura em edição no modal (null = modo criação).
+  const [faturaEditando, setFaturaEditando] = useState(null)
+
   // Modal de confirmação de cancelamento (substitui window.confirm nativo).
   const [faturaParaCancelar, setFaturaParaCancelar] = useState(null)
   const [cancelando, setCancelando] = useState(false)
+
+  // Modal de confirmação de exclusão.
+  const [faturaParaExcluir, setFaturaParaExcluir] = useState(null)
+  const [excluindo, setExcluindo] = useState(false)
 
   // Modal de pagamento com COMPROVANTE OBRIGATÓRIO.
   const [faturaParaPagar, setFaturaParaPagar] = useState(null)
@@ -25,24 +63,46 @@ export default function Faturas() {
   const [pagamentoError, setPagamentoError] = useState('')
   const [pagando, setPagando] = useState(false)
 
-  const [formData, setFormData] = useState({
-    numero: '',
-    cliente: '',
-    descricao: '',
-    tipo: 'a_receber',
-    valor: '',
-    vencimento: '',
-  })
+  const [formData, setFormData] = useState(FORMULARIO_VAZIO)
+
+  // Download de comprovante em andamento (botão 📎).
+  const [baixandoComprovante, setBaixandoComprovante] = useState(false)
+
+  // Abre o comprovante em nova aba COM AUTENTICAÇÃO: o JWT viaja no header
+  // (nunca na URL) e a resposta vira um blob local. O backend só serve o
+  // arquivo ao dono da fatura — 404 para qualquer outro usuário.
+  async function abrirComprovante(fatura) {
+    const url = urlComprovante(fatura.comprovante_url)
+    if (!url) return
+    setBaixandoComprovante(true)
+    try {
+      // baseURL vazia por chamada: /media/... NÃO deve receber o prefixo /api.
+      const response = await api.get(url, { baseURL: '', responseType: 'blob' })
+      const blobUrl = window.URL.createObjectURL(response.data)
+      window.open(blobUrl, '_blank', 'noopener,noreferrer')
+      // Libera a memória do blob depois que o navegador abre a aba.
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 30_000)
+    } catch {
+      setPageError('Não foi possível abrir o comprovante (arquivo indisponível ou sem permissão).')
+    } finally {
+      setBaixandoComprovante(false)
+    }
+  }
 
   useEffect(() => {
     fetchFaturas()
     fetchClientes()
+    fetchCategorias()
   }, [])
 
-  const fetchFaturas = async () => {
+  const fetchFaturas = async (params = filtros) => {
     try {
       setLoading(true)
-      const res = await api.get('/faturas/')
+      // Remove chaves vazias para não poluir a querystring.
+      const query = Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v !== '' && v != null)
+      )
+      const res = await api.get('/faturas/', { params: query })
       setFaturas(res.data.results || res.data)
     } catch (err) {
       console.error(err)
@@ -50,6 +110,18 @@ export default function Faturas() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const aplicarFiltros = (novos) => {
+    const atualizados = { ...filtros, ...novos }
+    setFiltros(atualizados)
+    fetchFaturas(atualizados)
+  }
+
+  const limparFiltros = () => {
+    const zerados = { status: '', tipo: '', vencimento_apos: '', vencimento_ate: '', busca: '' }
+    setFiltros(zerados)
+    fetchFaturas(zerados)
   }
 
   const fetchClientes = async () => {
@@ -61,26 +133,74 @@ export default function Faturas() {
     }
   }
 
-  const handleCreate = async (e) => {
+  const fetchCategorias = async () => {
+    try {
+      // A primeira listagem semeia o catálogo padrão no backend (idempotente).
+      const res = await api.get('/categorias/')
+      setCategorias(res.data.results || res.data)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const abrirModalNovo = () => {
+    setFaturaEditando(null)
+    setFormData(FORMULARIO_VAZIO)
+    setModalError('')
+    setShowModal(true)
+  }
+
+  const abrirModalEdicao = (fatura) => {
+    if (!ehEditavel(fatura)) return // defesa extra: pagas/vencidas não abrem edição
+    setFaturaEditando(fatura)
+    setFormData({
+      numero: fatura.numero || '',
+      cliente: String(fatura.cliente || ''),
+      descricao: fatura.descricao || '',
+      tipo: fatura.tipo || 'a_receber',
+      valor: fatura.valor ?? '',
+      vencimento: fatura.vencimento || '',
+      categoria: fatura.categoria ? String(fatura.categoria) : '',
+    })
+    setModalError('')
+    setShowModal(true)
+  }
+
+  const handleSalvar = async (e) => {
     e.preventDefault()
     setModalError('')
     setSubmitting(true)
     try {
-      await api.post('/faturas/', formData)
+      const payload = {
+        ...formData,
+        categoria: formData.categoria === '' ? null : formData.categoria,
+      }
+      if (faturaEditando) {
+        // Edição: PUT /api/faturas/{id}/ — bloqueado no backend para faturas pagas.
+        await api.put(`/faturas/${faturaEditando.id}/`, payload)
+      } else {
+        await api.post('/faturas/', payload)
+      }
       setShowModal(false)
-      setFormData({ numero: '', cliente: '', descricao: '', tipo: 'a_receber', valor: '', vencimento: '' })
+      setFaturaEditando(null)
+      setFormData(FORMULARIO_VAZIO)
       fetchFaturas()
     } catch (err) {
       console.error(err)
       const data = err.response?.data
-      let msg = 'Erro ao criar fatura.'
+      let msg = faturaEditando ? 'Erro ao salvar alterações.' : 'Erro ao criar fatura.'
 
       if (data) {
         if (typeof data.detail === 'string') msg = data.detail
-        else if (typeof data.numero === 'string') msg = `Número: ${data.numero}`
-        else if (Array.isArray(data.numero)) msg = `Número: ${data.numero[0]}`
-        else if (typeof data.non_field_errors === 'string') msg = data.non_field_errors
-        else if (Array.isArray(data.non_field_errors)) msg = data.non_field_errors[0]
+        else if (data.numero) msg = `Número: ${Array.isArray(data.numero) ? data.numero[0] : data.numero}`
+        else if (data.non_field_errors) {
+          msg = Array.isArray(data.non_field_errors) ? data.non_field_errors[0] : data.non_field_errors
+        } else if (typeof data === 'object') {
+          const parts = Object.entries(data).map(
+            ([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : String(value)}`
+          )
+          if (parts.length > 0) msg = parts.join(' | ')
+        }
       }
       setModalError(msg)
     } finally {
@@ -164,8 +284,52 @@ export default function Faturas() {
     }
   }
 
+  const handleExcluir = async () => {
+    if (!faturaParaExcluir) return
+    setExcluindo(true)
+    setPageError('')
+    try {
+      await api.delete(`/faturas/${faturaParaExcluir.id}/`)
+      setFaturaParaExcluir(null)
+      fetchFaturas()
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Não foi possível excluir a fatura.'
+      setPageError(msg)
+      setFaturaParaExcluir(null)
+    } finally {
+      setExcluindo(false)
+    }
+  }
+
   const formatCurrency = (val) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
+  }
+
+  // Exportação do extrato de faturas (respeita os filtros ativos na tela).
+  // Baixa autenticada via axios (blob) — o JWT nunca vai na URL.
+  const exportarFaturas = async (formato) => {
+    try {
+      const query = Object.fromEntries(
+        Object.entries({ ...filtros, formato }).filter(([, v]) => v !== '' && v != null)
+      )
+      const res = await api.get('/faturas/exportar/', {
+        params: query,
+        responseType: 'blob',
+      })
+      const nome = formato === 'pdf' ? 'faturas.pdf' : 'faturas.csv'
+      const url = window.URL.createObjectURL(new Blob([res.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', nome)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+      setPageError('')
+    } catch (err) {
+      console.error(err)
+      setPageError(`Falha ao exportar ${nome}.`)
+    }
   }
 
   return (
@@ -175,12 +339,77 @@ export default function Faturas() {
           <h1 className="page-title">Faturas & Contas</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Gestão de contas a pagar e a receber</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setModalError(''); setShowModal(true); }}>
-          + Nova Fatura
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-logout btn-sm" onClick={() => exportarFaturas('csv')}>
+            Exportar CSV
+          </button>
+          <button className="btn btn-logout btn-sm" onClick={() => exportarFaturas('pdf')}>
+            Exportar PDF
+          </button>
+          <button className="btn btn-primary" onClick={abrirModalNovo}>
+            + Nova Fatura
+          </button>
+        </div>
       </div>
 
       {pageError && <div className="alert-error" style={{ marginBottom: '1rem' }}>{pageError}</div>}
+
+      {/* ------------------------------------------------ Filtros avançados */}
+      <div className="card-table" style={{ padding: '1rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem' }}>
+          <select
+            className="form-select"
+            value={filtros.status}
+            onChange={(e) => aplicarFiltros({ status: e.target.value })}
+            aria-label="Filtrar por status"
+          >
+            <option value="">Status: todos</option>
+            <option value="pendente">Pendente</option>
+            <option value="paga">Paga</option>
+            <option value="vencida">Vencida</option>
+            <option value="cancelada">Cancelada</option>
+          </select>
+
+          <select
+            className="form-select"
+            value={filtros.tipo}
+            onChange={(e) => aplicarFiltros({ tipo: e.target.value })}
+            aria-label="Filtrar por tipo"
+          >
+            <option value="">Tipo: todos</option>
+            <option value="a_receber">A Receber</option>
+            <option value="a_pagar">A Pagar</option>
+          </select>
+
+          <input
+            type="date"
+            className="form-input"
+            value={filtros.vencimento_apos}
+            onChange={(e) => aplicarFiltros({ vencimento_apos: e.target.value })}
+            aria-label="Vencimento a partir de"
+            title="Vencimento a partir de"
+          />
+          <input
+            type="date"
+            className="form-input"
+            value={filtros.vencimento_ate}
+            onChange={(e) => aplicarFiltros({ vencimento_ate: e.target.value })}
+            aria-label="Vencimento até"
+            title="Vencimento até"
+          />
+          <input
+            type="search"
+            className="form-input"
+            placeholder="Buscar número/descrição..."
+            value={filtros.busca}
+            onChange={(e) => aplicarFiltros({ busca: e.target.value })}
+            aria-label="Buscar faturas"
+          />
+          <button className="btn btn-logout" onClick={limparFiltros}>
+            Limpar filtros
+          </button>
+        </div>
+      </div>
 
       <div className="card-table">
         <table className="data-table">
@@ -188,6 +417,7 @@ export default function Faturas() {
             <tr>
               <th>Número</th>
               <th>Cliente / Fornecedor</th>
+              <th>Categoria</th>
               <th>Descrição</th>
               <th>Tipo</th>
               <th>Vencimento</th>
@@ -199,30 +429,18 @@ export default function Faturas() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Carregando faturas...</td>
+                <td colSpan="9" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Carregando faturas...</td>
               </tr>
             ) : faturas.length === 0 ? (
               <tr>
-                <td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Nenhuma fatura cadastrada.</td>
+                <td colSpan="9" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Nenhuma fatura cadastrada.</td>
               </tr>
             ) : (
               faturas.map((f) => (
                 <tr key={f.id}>
-                  <td style={{ fontWeight: 600 }}>
-                    {f.numero}
-                    {f.comprovante_url && (
-                      <a
-                        href={f.comprovante_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Ver comprovante de pagamento"
-                        style={{ marginLeft: '6px', textDecoration: 'none' }}
-                      >
-                        📎
-                      </a>
-                    )}
-                  </td>
+                  <td style={{ fontWeight: 600 }}>{f.numero}</td>
                   <td>{f.cliente_nome || f.cliente}</td>
+                  <td>{f.categoria_nome || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
                   <td>{f.descricao || '—'}</td>
                   <td style={{ minWidth: '90px' }}>
                     <span style={{ color: f.tipo === 'a_receber' ? 'var(--accent-success)' : 'var(--accent-danger)', fontWeight: 600, whiteSpace: 'nowrap' }}>
@@ -237,30 +455,58 @@ export default function Faturas() {
                     </span>
                   </td>
                   <td style={{ textAlign: 'right' }}>
-                    {f.status !== 'paga' && f.status !== 'cancelada' && (
-                      <div
-                        style={{
-                          display: 'flex',
-                          gap: '8px',
-                          alignItems: 'center',
-                          justifyContent: 'flex-end',
-                          flexWrap: 'nowrap',
-                        }}
-                      >
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '8px',
+                        alignItems: 'center',
+                        justifyContent: 'flex-end',
+                        flexWrap: 'nowrap',
+                      }}
+                    >
+                      {/* Faturas PAGAS: somente leitura + ver comprovante 📎 */}
+                      {f.status === 'paga' && f.comprovante_url && (
+                        <button
+                          className="btn btn-logout btn-sm"
+                          onClick={() => abrirComprovante(f)}
+                          disabled={baixandoComprovante}
+                          title="Ver comprovante de pagamento"
+                        >
+                          📎 Comprovante
+                        </button>
+                      )}
+                      {ehEditavel(f) && (
+                        <>
+                          <button
+                            className="btn btn-success btn-sm"
+                            onClick={() => abrirModalPagar(f)}
+                          >
+                            {f.tipo === 'a_pagar' ? 'Pagar' : 'Receber'}
+                          </button>
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={() => abrirModalEdicao(f)}
+                            title="Editar fatura"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            className="btn btn-danger btn-sm"
+                            onClick={() => setFaturaParaCancelar(f)}
+                          >
+                            Cancelar
+                          </button>
+                        </>
+                      )}
+                      {f.status === 'vencida' && (
                         <button
                           className="btn btn-success btn-sm"
                           onClick={() => abrirModalPagar(f)}
                         >
-                          {f.tipo === 'a_pagar' ? 'Pagar' : 'Registrar Recebimento'}
+                          {f.tipo === 'a_pagar' ? 'Pagar' : 'Receber'}
                         </button>
-                        <button
-                          className="btn btn-danger btn-sm"
-                          onClick={() => setFaturaParaCancelar(f)}
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -277,6 +523,17 @@ export default function Faturas() {
           aoConfirmar={handleCancelar}
           aoCancelar={() => setFaturaParaCancelar(null)}
           processando={cancelando}
+        />
+      )}
+
+      {faturaParaExcluir && (
+        <ConfirmDialog
+          titulo="Excluir fatura"
+          mensagem={`Tem certeza que deseja excluir a fatura ${faturaParaExcluir.numero}? Esta ação não pode ser desfeita.`}
+          textoConfirmar="Excluir definitivamente"
+          aoConfirmar={handleExcluir}
+          aoCancelar={() => setFaturaParaExcluir(null)}
+          processando={excluindo}
         />
       )}
 
@@ -349,7 +606,9 @@ export default function Faturas() {
         <div className="modal-overlay">
           <div className="modal-card">
             <div className="modal-header">
-              <h3 className="modal-title">Nova Fatura</h3>
+              <h3 className="modal-title">
+                {faturaEditando ? `Editar fatura ${faturaEditando.numero}` : 'Nova Fatura'}
+              </h3>
               <button className="btn-logout" onClick={() => setShowModal(false)}>✕</button>
             </div>
 
@@ -359,7 +618,7 @@ export default function Faturas() {
               </div>
             )}
 
-            <form onSubmit={handleCreate}>
+            <form onSubmit={handleSalvar}>
               <div className="form-group">
                 <label className="form-label">Número da Fatura</label>
                 <input
@@ -397,6 +656,22 @@ export default function Faturas() {
                   value={formData.descricao}
                   onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
                 />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Categoria (centro de custo)</label>
+                <select
+                  className="form-select"
+                  value={formData.categoria}
+                  onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
+                >
+                  <option value="">Sem categoria</option>
+                  {categorias.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.nome} ({cat.natureza === 'receita' ? 'receita' : 'despesa'})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -441,7 +716,7 @@ export default function Faturas() {
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  {submitting ? 'Salvando...' : 'Salvar Fatura'}
+                  {submitting ? 'Salvando...' : faturaEditando ? 'Salvar Alterações' : 'Salvar Fatura'}
                 </button>
               </div>
             </form>

@@ -1,18 +1,18 @@
 """
-Testes dos lembretes de vencimento por e-mail (Fase 3).
+Testes dos lembretes de vencimento por e-mail (Fase 3 — janelas expandidas).
 
 Usam o backend de teste (configurado em settings_test como
 anymail.backends.test.EmailBackend, capturado via fixture mailoutbox)
-— nenhum e-mail real é enviado. Cobrem as regras da spec: envio quando a
-condição é satisfeita, idempotência no mesmo dia, fatura paga/cancelada
-não recebe, cliente com notificacoes_ativas=False não recebe.
+— nenhum e-mail real é enviado. Cobrem as regras da spec: envio nas
+janelas de 10/5/1 dia(s) antes e no dia do vencimento (0), idempotência
+no mesmo dia, fatura paga/cancelada não recebe, cliente com
+notificacoes_ativas=False não recebe.
 """
 
 from datetime import timedelta
 from decimal import Decimal
 
 import pytest
-from django.conf import settings
 from django.utils import timezone
 
 from apps.clientes.models import Cliente, Papel
@@ -20,7 +20,8 @@ from apps.faturamento import services
 from apps.faturamento.models import Fatura, StatusFatura, TipoFatura
 
 HOJE = timezone.localdate()
-DIAS = getattr(settings, "LEMRETE_DIAS_ANTES", 3)
+# Janelas da spec: prévios em 10/5/1 dias + aviso no dia (0).
+JANELAS = services.LEMBRETES_JANELAS_DIAS  # (10, 5, 1)
 ZERADO = {
     "lembretes_previos_enviados": 0,
     "lembretes_vencimento_enviados": 0,
@@ -59,28 +60,23 @@ def cliente_com_email(user):
     )
 
 
-@pytest.fixture
-def fatura_vence_em_3_dias(cliente_com_email, user):
+def _fatura_vence_em(cliente, owner, dias, numero="FAT-LEM-PREV"):
     return _criar_fatura(
-        cliente_com_email,
-        user,
-        numero="FAT-LEM-PREV",
-        vencimento=HOJE + timedelta(days=DIAS),
+        cliente, owner, numero=numero, vencimento=HOJE + timedelta(days=dias)
     )
 
 
-@pytest.fixture
-def fatura_vence_hoje(cliente_com_email, user):
-    return _criar_fatura(cliente_com_email, user, numero="FAT-LEM-HOJE", vencimento=HOJE)
-
-
 # ---------------------------------------------------------------------------
-# Envio quando a condição é satisfeita
+# Envio quando a condição é satisfeita (janelas 10/5/1/0)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db
-def test_envia_lembrete_previo(mailoutbox, fatura_vence_em_3_dias):
+@pytest.mark.parametrize("dias", JANELAS)
+def test_envia_lembrete_previo_em_cada_janela(mailoutbox, cliente_com_email, user, dias):
+    """Cada janela prévia (10, 5 e 1 dias) dispara o e-mail correspondente."""
+    _fatura_vence_em(cliente_com_email, user, dias, numero=f"FAT-J{dias}")
+
     resultado = services.enviar_lembretes_vencimento()
 
     assert resultado["lembretes_previos_enviados"] == 1
@@ -88,33 +84,55 @@ def test_envia_lembrete_previo(mailoutbox, fatura_vence_em_3_dias):
 
     email = mailoutbox[0]
     assert email.to == ["maria@cliente.com"]
-    assert f"FAT-LEM-PREV vence em {DIAS} dias" in email.subject
+    if dias == 1:
+        esperado = f"FAT-J{dias} vence amanhã"
+    else:
+        esperado = f"FAT-J{dias} vence em {dias} dias"
+    assert esperado in email.subject
     # DecimalField é localizado pelo Django (pt-BR): vírgula como separador decimal.
     assert "R$ 350,00" in email.body
     assert "Maria Cliente" in email.body
     # Assinatura com o nome do dono da fatura
-    assert fatura_vence_em_3_dias.owner.get_username() in email.body
+    assert user.get_username() in email.body
 
 
 @pytest.mark.django_db
-def test_envia_lembrete_de_vencimento_hoje(mailoutbox, fatura_vence_hoje):
+def test_envia_lembrete_de_vencimento_hoje(mailoutbox, cliente_com_email, user):
+    _fatura_vence_em(cliente_com_email, user, 0, numero="FAT-LEM-HOJE")
+
     resultado = services.enviar_lembretes_vencimento()
 
     assert resultado["lembretes_vencimento_enviados"] == 1
     assert len(mailoutbox) == 1
     email = mailoutbox[0]
     assert email.to == ["maria@cliente.com"]
-    assert fatura_vence_hoje.numero in email.subject
+    assert "FAT-LEM-HOJE" in email.subject
 
 
 @pytest.mark.django_db
-def test_data_de_envio_gravada_apos_sucesso(fatura_vence_em_3_dias, fatura_vence_hoje):
+def test_todas_janelas_no_mesmo_dia_de_execucao(mailoutbox, cliente_com_email, user):
+    """Faturas que caem nas 4 janelas recebem cada uma seu lembrete."""
+    for i, dias in enumerate((*JANELAS, 0)):
+        _fatura_vence_em(cliente_com_email, user, dias, numero=f"FAT-MULTI-{i}")
+
+    resultado = services.enviar_lembretes_vencimento()
+
+    assert resultado["lembretes_previos_enviados"] == len(JANELAS)
+    assert resultado["lembretes_vencimento_enviados"] == 1
+    assert len(mailoutbox) == len(JANELAS) + 1
+
+
+@pytest.mark.django_db
+def test_data_de_envio_gravada_apos_sucesso(cliente_com_email, user):
+    f_previa = _fatura_vence_em(cliente_com_email, user, 10, numero="FAT-GRava-10")
+    f_hoje = _fatura_vence_em(cliente_com_email, user, 0, numero="FAT-GRAVA-0")
+
     services.enviar_lembretes_vencimento()
 
-    fatura_vence_em_3_dias.refresh_from_db()
-    fatura_vence_hoje.refresh_from_db()
-    assert fatura_vence_em_3_dias.lembrete_previo_enviado_em is not None
-    assert fatura_vence_hoje.lembrete_vencimento_enviado_em is not None
+    f_previa.refresh_from_db()
+    f_hoje.refresh_from_db()
+    assert f_previa.lembrete_previo_enviado_em is not None
+    assert f_hoje.lembrete_vencimento_enviado_em is not None
 
 
 # ---------------------------------------------------------------------------
@@ -123,9 +141,10 @@ def test_data_de_envio_gravada_apos_sucesso(fatura_vence_em_3_dias, fatura_vence
 
 
 @pytest.mark.django_db
-def test_rodar_duas_vezes_nao_duplica_envio(
-    mailoutbox, fatura_vence_em_3_dias, fatura_vence_hoje
-):
+def test_rodar_duas_vezes_nao_duplica_envio(mailoutbox, cliente_com_email, user):
+    _fatura_vence_em(cliente_com_email, user, 10, numero="FAT-IDEM-10")
+    _fatura_vence_em(cliente_com_email, user, 0, numero="FAT-IDEM-0")
+
     primeiro = services.enviar_lembretes_vencimento()
     assert primeiro["lembretes_previos_enviados"] == 1
     assert primeiro["lembretes_vencimento_enviados"] == 1
@@ -137,9 +156,10 @@ def test_rodar_duas_vezes_nao_duplica_envio(
 
 
 @pytest.mark.django_db
-def test_lembrete_enviado_via_task_celery(mailoutbox, fatura_vence_hoje):
+def test_lembrete_enviado_via_task_celery(mailoutbox, cliente_com_email, user):
     from apps.faturamento.tasks import task_enviar_lembretes_vencimento
 
+    _fatura_vence_em(cliente_com_email, user, 0, numero="FAT-TASK")
     task_enviar_lembretes_vencimento()
     assert len(mailoutbox) == 1
 
@@ -178,13 +198,9 @@ def test_cliente_sem_notificacoes_nao_recebe(mailoutbox, user):
         notificacoes_ativas=False,
         owner=user,
     )
-    _criar_fatura(cliente, user, numero="FAT-SEM-NOTIF", vencimento=HOJE)
-    _criar_fatura(
-        cliente,
-        user,
-        numero="FAT-SEM-NOTIF-PREV",
-        vencimento=HOJE + timedelta(days=DIAS),
-    )
+    _fatura_vence_em(cliente, user, 0, numero="FAT-SEM-NOTIF")
+    _fatura_vence_em(cliente, user, 10, numero="FAT-SEM-NOTIF-PREV")
+    _fatura_vence_em(cliente, user, 5, numero="FAT-SEM-NOTIF-PREV5")
 
     resultado = services.enviar_lembretes_vencimento()
     assert resultado == ZERADO
@@ -215,6 +231,17 @@ def test_fatura_a_pagar_nao_gera_lembrete(mailoutbox, cliente_com_email, user):
 def test_cliente_sem_email_e_pulado(mailoutbox, user):
     cliente = Cliente.objects.create(nome="Sem Email", owner=user)  # email=""
     _criar_fatura(cliente, user, numero="FAT-SEM-EMAIL", vencimento=HOJE)
+    resultado = services.enviar_lembretes_vencimento()
+    assert resultado == ZERADO
+    assert len(mailoutbox) == 0
+
+
+@pytest.mark.django_db
+def test_dias_fora_das_janelas_nao_envia(mailoutbox, cliente_com_email, user):
+    """Vencimentos a 2, 4, 9 ou 11 dias NÃO disparam lembrete prévio."""
+    for dias in (2, 4, 9, 11):
+        _fatura_vence_em(cliente_com_email, user, dias, numero=f"FAT-FORA-{dias}")
+
     resultado = services.enviar_lembretes_vencimento()
     assert resultado == ZERADO
     assert len(mailoutbox) == 0

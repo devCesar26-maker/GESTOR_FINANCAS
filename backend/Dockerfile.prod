@@ -1,0 +1,31 @@
+# Imagem de produção do BACKEND FinFlow.
+#
+# Diferenças do Dockerfile de dev:
+# - Usa imagem base slim sem ferramentas de build (deps já binárias no pip).
+# - Roda como usuário não-root (segurança).
+# - O código NÃO é embutido na imagem: em produção o deploy injeta o código
+#   (volume/CI), mantendo esta imagem única para backend/worker/beat.
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DJANGO_SETTINGS_MODULE=finflow.settings
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
+# Usuário não-root; /app é montado pelo deploy (código) e precisa ser
+# gravável para MEDIA_ROOT (comprovantes) e STATIC_ROOT (collectstatic).
+RUN useradd --create-home appuser \
+    && mkdir -p /app/media /app/staticfiles \
+    && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8000
+
+CMD ["./entrypoint.sh", "gunicorn", "finflow.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]

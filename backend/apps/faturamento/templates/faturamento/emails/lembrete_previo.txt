@@ -1,6 +1,6 @@
 Olá, {{ cliente_nome }},
 
-Passando para lembrar que a fatura {{ numero }} vence em {{ dias }} dia(s).
+Passando para lembrar que a fatura {{ numero }} vence{% if dias == 1 %} amanhã{% else %} em {{ dias }} dias{% endif %}.
 
   Valor:      R$ {{ valor }}
   Vencimento: {{ vencimento }}

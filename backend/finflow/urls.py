@@ -7,7 +7,6 @@ apenas suas próprias rotas, mantendo o roteamento descentralizado.
 from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
-from django.conf.urls.static import static
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
@@ -52,7 +51,15 @@ urlpatterns = [
     path("api/relatorios/", include("apps.relatorios.urls")),
 ]
 
-# Servindo de arquivos de mídia (comprovantes) apenas em DEBUG. Em
-# produção o nginx/servidor web deve servir MEDIA_URL diretamente.
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Servindo de arquivos de mídia (comprovantes) SEMPRE PROTEGIDO: a rota
+# cai em MediaProtegidaView (JWT + isolamento por tenant), tanto em dev
+# quanto em produção. Nunca sirva /media/ estaticamente sem autenticação.
+from apps.faturamento.media_views import MediaProtegidaView
+
+urlpatterns += [
+    # Download direto autenticado (dev e produção sem Nginx na borda).
+    path(settings.MEDIA_URL.lstrip("/") + "<path:caminho_url>", MediaProtegidaView.as_view()),
+    # Subauth do Nginx (auth_request em deploy/nginx.conf): valida JWT +
+    # dono do arquivo via X-Original-URI. Responde 200/401 apenas.
+    path("api/media/auth/", MediaProtegidaView.as_view()),
+]

@@ -200,8 +200,11 @@ DEFAULT_FROM_EMAIL = os.getenv(
     "DEFAULT_FROM_EMAIL", "FinFlow <projetodefinancas34@gmail.com>"
 )
 
-# Lembrete: grafia "LEMRETE" mantida conforme especificação do projeto.
-LEMRETE_DIAS_ANTES = env_int("LEMRETE_DIAS_ANTES", 3)
+# Lembretes de vencimento: janelas de disparo em dias antes do vencimento.
+# Prévios em 10/5/1 dias + aviso no dia do vencimento (0). A grafia legada
+# "LEMRETE" é mantida nas variáveis já existentes.
+LEMRETE_JANELAS_DIAS = [10, 5, 1]
+LEMRETE_DIAS_ANTES = env_int("LEMRETE_DIAS_ANTES", 3)  # DEPRECIADO (compat legado)
 
 # ---------------------------------------------------------------------------
 # Cache (Redis) — usado pelo throttling do DRF

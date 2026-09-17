@@ -19,11 +19,16 @@ def task_marcar_faturas_vencidas():
 
 @shared_task
 def task_enviar_lembretes_vencimento():
-    """Envia lembretes de vencimento (prévio e no dia) por e-mail."""
+    """Envia lembretes de vencimento por e-mail.
+
+    Janelas de disparo em relação ao vencimento: 10 dias antes, 5 dias
+    antes, 1 dia antes e no dia do vencimento (0 dias). Cada janela envia
+    uma única vez por fatura (idempotência pelos campos lembrete_*_enviado_em).
+    """
     resultado = services.enviar_lembretes_vencimento()
     return (
-        "Lembretes: {previos} prévios enviados, {hoje} de vencimento hoje, "
-        "{falhas} falha(s).".format(
+        "Lembretes: {previos} prévios enviados (janelas 10/5/1 dias), "
+        "{hoje} de vencimento hoje, {falhas} falha(s).".format(
             previos=resultado["lembretes_previos_enviados"],
             hoje=resultado["lembretes_vencimento_enviados"],
             falhas=resultado["falhas"],

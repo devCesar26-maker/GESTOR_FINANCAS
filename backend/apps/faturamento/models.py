@@ -32,6 +32,73 @@ class Periodicidade(models.TextChoices):
     ANUAL = "anual", "Anual"
 
 
+class CategoriaFinanceira(models.Model):
+    """Centro de custo/receita: agrupa faturas para o DRE e o Dashboard.
+
+    Cada owner mantém seu próprio catálogo (multi-tenancy); a lista inicial
+    de sugestões vem de CATEGORIAS_PADRAO. A aparência no gráfico (cor e
+    agrupamento receita/despesa) é derivada daqui.
+    """
+
+    class Natureza(models.TextChoices):
+        RECEITA = "receita", "Receita"
+        DESPESA = "despesa", "Despesa"
+
+    CATEGORIAS_PADRAO = [
+        # (nome, natureza)
+        ("Vendas de Serviços", Natureza.RECEITA),
+        ("Vendas de Produtos", Natureza.RECEITA),
+        ("Outras Receitas", Natureza.RECEITA),
+        ("Aluguel", Natureza.DESPESA),
+        ("Salários", Natureza.DESPESA),
+        ("Infraestrutura", Natureza.DESPESA),
+        ("Impostos", Natureza.DESPESA),
+        ("Outras Despesas", Natureza.DESPESA),
+    ]
+
+    nome = models.CharField("nome", max_length=100)
+    natureza = models.CharField(
+        "natureza",
+        max_length=20,
+        choices=Natureza.choices,
+        default=Natureza.DESPESA,
+        help_text="Define se a categoria agrupa receitas ou despesas no DRE.",
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="categorias_financeiras",
+        verbose_name="dono",
+    )
+    created_at = models.DateTimeField("criado em", auto_now_add=True)
+    updated_at = models.DateTimeField("atualizado em", auto_now=True)
+
+    class Meta:
+        verbose_name = "categoria financeira"
+        verbose_name_plural = "categorias financeiras"
+        ordering = ["nome"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner", "nome"],
+                name="uniq_categoria_owner_nome",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.nome
+
+    @classmethod
+    def criar_categorias_padrao(cls, owner) -> None:
+        """Semeia o catálogo padrão de categorias para um owner (idempotente)."""
+        cls.objects.bulk_create(
+            [
+                cls(owner=owner, nome=nome, natureza=natureza)
+                for nome, natureza in cls.CATEGORIAS_PADRAO
+            ],
+            ignore_conflicts=True,
+        )
+
+
 class Fatura(models.Model):
     """Conta a pagar ou a receber vinculada a um cliente/fornecedor."""
 
@@ -79,6 +146,15 @@ class Fatura(models.Model):
     )
     lembrete_vencimento_enviado_em = models.DateTimeField(
         "lembrete de vencimento enviado em", blank=True, null=True
+    )
+    # Categorização financeira (centros de custo): NULL = "Sem categoria".
+    categoria = models.ForeignKey(
+        "faturamento.CategoriaFinanceira",
+        on_delete=models.SET_NULL,
+        related_name="faturas",
+        verbose_name="categoria",
+        blank=True,
+        null=True,
     )
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -162,6 +238,15 @@ class CobrancaRecorrente(models.Model):
     ativa = models.BooleanField("ativa", default=True)
     ultima_execucao = models.DateTimeField(
         "última execução", blank=True, null=True
+    )
+    # Categorização financeira (centros de custo): herdada pela fatura gerada.
+    categoria = models.ForeignKey(
+        "faturamento.CategoriaFinanceira",
+        on_delete=models.SET_NULL,
+        related_name="cobrancas_recorrentes",
+        verbose_name="categoria",
+        blank=True,
+        null=True,
     )
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,

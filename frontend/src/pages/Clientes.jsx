@@ -3,8 +3,19 @@ import api from '../api/client'
 import Layout from '../components/Layout'
 import ConfirmDialog from '../components/ConfirmDialog'
 
+const FORMULARIO_VAZIO = {
+  nome: '',
+  papel: 'cliente',
+  tipo_pessoa: 'pf',
+  documento: '',
+  email: '',
+  telefone: '',
+  notificacoes_ativas: true,
+}
+
 export default function Clientes() {
   const [clientes, setClientes] = useState([])
+  const [busca, setBusca] = useState('')
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [pageError, setPageError] = useState('')
@@ -15,27 +26,24 @@ export default function Clientes() {
   const [clienteParaExcluir, setClienteParaExcluir] = useState(null)
   const [excluindo, setExcluindo] = useState(false)
 
+  // Edição: cliente em edição no modal (null = modo criação).
+  const [clienteEditando, setClienteEditando] = useState(null)
+
   // Erros de validação inline, por campo (exibidos sob cada input).
   const [fieldErrors, setFieldErrors] = useState({})
 
-  const [formData, setFormData] = useState({
-    nome: '',
-    papel: 'cliente',
-    tipo_pessoa: 'pf',
-    documento: '',
-    email: '',
-    telefone: '',
-    notificacoes_ativas: true,
-  })
+  const [formData, setFormData] = useState(FORMULARIO_VAZIO)
 
   useEffect(() => {
     fetchClientes()
   }, [])
 
-  const fetchClientes = async () => {
+  const fetchClientes = async (termo = busca) => {
     try {
       setLoading(true)
-      const res = await api.get('/clientes/')
+      // Busca textual server-side (ORM no backend): nome, CPF/CNPJ, e-mail e telefone.
+      const params = termo.trim() ? { search: termo.trim() } : {}
+      const res = await api.get('/clientes/', { params })
       setClientes(res.data.results || res.data)
     } catch (err) {
       console.error(err)
@@ -44,6 +52,15 @@ export default function Clientes() {
       setLoading(false)
     }
   }
+
+  // Debounce simples da busca textual (evita request a cada tecla).
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchClientes(busca)
+    }, 350)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busca])
 
   // -----------------------------------------------------------------------
   // Validação inline (antes do submit) — mensagens legíveis por campo.
@@ -82,7 +99,32 @@ export default function Clientes() {
     return erros
   }
 
-  const handleCreate = async (e) => {
+  const abrirModalNovo = () => {
+    setClienteEditando(null)
+    setFormData(FORMULARIO_VAZIO)
+    setModalError('')
+    setFieldErrors({})
+    setShowModal(true)
+  }
+
+  const abrirModalEdicao = (cliente) => {
+    // Modal PRÉ-PREENCHIDO com os dados atuais do registro.
+    setClienteEditando(cliente)
+    setFormData({
+      nome: cliente.nome || '',
+      papel: cliente.papel || 'cliente',
+      tipo_pessoa: cliente.tipo_pessoa || 'pf',
+      documento: cliente.documento || '',
+      email: cliente.email || '',
+      telefone: cliente.telefone || '',
+      notificacoes_ativas: cliente.notificacoes_ativas !== false,
+    })
+    setModalError('')
+    setFieldErrors({})
+    setShowModal(true)
+  }
+
+  const handleSalvar = async (e) => {
     e.preventDefault()
     setModalError('')
 
@@ -92,14 +134,20 @@ export default function Clientes() {
 
     setSubmitting(true)
     try {
-      await api.post('/clientes/', formData)
+      if (clienteEditando) {
+        // Edição: PUT /api/clientes/{id}/ com payload completo.
+        await api.put(`/clientes/${clienteEditando.id}/`, formData)
+      } else {
+        await api.post('/clientes/', formData)
+      }
       setShowModal(false)
-      setFormData({ nome: '', papel: 'cliente', tipo_pessoa: 'pf', documento: '', email: '', telefone: '', notificacoes_ativas: true })
+      setClienteEditando(null)
+      setFormData(FORMULARIO_VAZIO)
       fetchClientes()
     } catch (err) {
       console.error(err)
       const data = err.response?.data
-      let msg = 'Erro ao cadastrar cliente.'
+      let msg = clienteEditando ? 'Erro ao salvar alterações.' : 'Erro ao cadastrar cliente.'
 
       if (data && typeof data === 'object') {
         const errorMessages = []
@@ -144,12 +192,31 @@ export default function Clientes() {
           <h1 className="page-title">Clientes e Fornecedores</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Gestão de cadastros da sua empresa</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setModalError(''); setFieldErrors({}); setShowModal(true); }}>
+        <button className="btn btn-primary" onClick={abrirModalNovo}>
           + Novo Cadastro
         </button>
       </div>
 
       {pageError && <div className="alert-error" style={{ marginBottom: '1rem' }}>{pageError}</div>}
+
+      <div className="card-table" style={{ padding: '1rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="search"
+            className="form-input"
+            style={{ maxWidth: 420 }}
+            placeholder="Buscar por nome, CPF/CNPJ ou e-mail..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            aria-label="Buscar clientes"
+          />
+          {busca && (
+            <button className="btn btn-logout btn-sm" onClick={() => setBusca('')}>
+              Limpar
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className="card-table">
         <table className="data-table">
@@ -171,7 +238,9 @@ export default function Clientes() {
               </tr>
             ) : clientes.length === 0 ? (
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Nenhum cliente cadastrado.</td>
+                <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                  {busca ? 'Nenhum cliente encontrado para a busca.' : 'Nenhum cliente cadastrado.'}
+                </td>
               </tr>
             ) : (
               clientes.map((c) => (
@@ -191,9 +260,22 @@ export default function Clientes() {
                       : <span className="badge badge-pendente">sem lembretes</span>}
                   </td>
                   <td style={{ textAlign: 'right' }}>
-                    <button className="btn btn-danger btn-sm" onClick={() => setClienteParaExcluir(c)}>
-                      Excluir
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => abrirModalEdicao(c)}
+                        title="Editar cadastro"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => setClienteParaExcluir(c)}
+                        title="Excluir cadastro"
+                      >
+                        Excluir
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -217,7 +299,9 @@ export default function Clientes() {
         <div className="modal-overlay">
           <div className="modal-card">
             <div className="modal-header">
-              <h3 className="modal-title">Novo Cadastro</h3>
+              <h3 className="modal-title">
+                {clienteEditando ? `Editar: ${clienteEditando.nome}` : 'Novo Cadastro'}
+              </h3>
               <button className="btn-logout" onClick={() => setShowModal(false)}>✕</button>
             </div>
 
@@ -227,7 +311,7 @@ export default function Clientes() {
               </div>
             )}
 
-            <form onSubmit={handleCreate} noValidate>
+            <form onSubmit={handleSalvar} noValidate>
               <div className="form-group">
                 <label className="form-label">Nome Completo / Razão Social *</label>
                 <input
@@ -324,7 +408,7 @@ export default function Clientes() {
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  {submitting ? 'Salvando...' : 'Salvar'}
+                  {submitting ? 'Salvando...' : clienteEditando ? 'Salvar Alterações' : 'Salvar'}
                 </button>
               </div>
             </form>

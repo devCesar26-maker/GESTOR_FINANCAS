@@ -1,1 +1,1 @@
-Lembrete: fatura {{ numero }} vence em {{ dias }} dias
+Lembrete: fatura {{ numero }} vence{% if dias == 1 %} amanhã{% else %} em {{ dias }} dias{% endif %}

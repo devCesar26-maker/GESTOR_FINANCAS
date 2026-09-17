@@ -1,0 +1,139 @@
+# Stack de PRODUÇÃO do FinFlow.
+#
+# Diferenças em relação ao docker-compose.yml (dev):
+# - Nginx na borda (porta 80): serve a SPA, /static/, e /media/ com
+#   auth_request (comprovantes protegidos por JWT — ver deploy/nginx.conf).
+# - Frontend vira bundle estático (Dockerfile.prod), não dev server.
+# - DEBUG=false, chaves sensíveis vêm do .env de produção (nunca hardcoded).
+# - MEDIA_ROOT e STATIC_ROOT em volumes nomeados compartilhados
+#   backend <-> nginx.
+#
+# Uso:
+#   docker compose -f docker-compose.prod.yml build
+#   docker compose -f docker-compose.prod.yml up -d
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-FINANCEIRO}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD e obrigatorio}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-FINANCEIRO}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    command: ./entrypoint.sh gunicorn finflow.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    env_file:
+      - ./backend/.env
+    environment:
+      DEBUG: "false"
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: ${DB_NAME:-FINANCEIRO}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: db
+      DB_PORT: "5432"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    volumes:
+      - media_files:/app/media
+      - static_files:/app/staticfiles
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    command: celery -A finflow worker -l info
+    env_file:
+      - ./backend/.env
+    environment:
+      DEBUG: "false"
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: ${DB_NAME:-FINANCEIRO}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: db
+      DB_PORT: "5432"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    volumes:
+      - media_files:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: unless-stopped
+
+  beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    command: celery -A finflow beat -l info
+    env_file:
+      - ./backend/.env
+    environment:
+      DEBUG: "false"
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: ${DB_NAME:-FINANCEIRO}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: db
+      DB_PORT: "5432"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    volumes:
+      - media_files:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile.prod
+    ports:
+      - "80:80"
+    volumes:
+      - media_files:/media:ro
+      - static_files:/static:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  media_files:
+  static_files:
