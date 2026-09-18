@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell, PieChart, Pie } from 'recharts'
 import api from '../api/client'
 import Layout from '../components/Layout'
 
@@ -40,10 +40,85 @@ const IconWallet = () => (
   </svg>
 )
 
-const CORES_CATEGORIAS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#06b6d4', '#f97316', '#14b8a6', '#ec4899']
+// Paletas das pizzas do DRE: tons frios para receitas, quentes para despesas.
+// "Sem categoria" usa cinza neutro — nunca verde/vermelho semântico, para não
+// confundir com dado categorizado de verdade.
+const CORES_RECEITAS = ['#3b82f6', '#06b6d4', '#8b5cf6', '#14b8a6', '#a78bfa', '#22d3ee', '#ec4899', '#6366f1']
+const CORES_DESPESAS = ['#f97316', '#f59e0b', '#eab308', '#f472b6', '#fb7185', '#d946ef', '#fb923c', '#facc15']
+const COR_SEM_CATEGORIA = '#64748b'
 
-const rotuloMoedaCompacta = (val) =>
-  new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(val || 0)
+const formatCurrency = (val) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
+
+const TOOLTIP_STYLE = {
+  backgroundColor: '#101d20',
+  borderColor: '#24393e',
+  borderRadius: '2px',
+  border: '1px solid #24393e',
+  color: '#ecf1ef',
+}
+
+// Pizza do DRE: fatias proporcionais ao valor de cada categoria.
+// Visual limpo: SEM rótulos de % sobre as fatias (números dentro de fatias
+// finas se sobrepõem) — a legenda inferior já mostra "Categoria — R$ x (y%)"
+// e o tooltip mostra o valor ao passar o mouse.
+function GraficoPizza({ titulo, corTitulo, dados, mensagemVazia }) {
+  const total = dados.reduce((soma, item) => soma + item.valor, 0)
+
+  // Legenda com valores: "Categoria — R$ 1.234,56 (34,5%)".
+  const legendaComValores = (nome, entrada) => {
+    const item = entrada?.payload
+    if (!item || !item.valor) return nome
+    const pct = total > 0 ? ((item.valor / total) * 100).toFixed(1).replace('.', ',') : '0'
+    return `${nome} — ${formatCurrency(item.valor)} (${pct}%)`
+  }
+
+  return (
+    <div>
+      <h4 style={{ fontSize: '0.95rem', marginBottom: '0.5rem', color: corTitulo }}>{titulo}</h4>
+      {dados.length === 0 ? (
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{mensagemVazia}</p>
+      ) : (
+        <div style={{ width: '100%', height: 300 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={dados}
+                dataKey="valor"
+                nameKey="nome"
+                cx="50%"
+                cy="42%"
+                innerRadius={55}
+                outerRadius={88}
+                paddingAngle={2}
+                stroke="none"
+                // Renderização determinística (sem animação de entrada):
+                // screenshots/testes e verificação visual mais simples.
+                isAnimationActive={false}
+              >
+                {dados.map((entrada) => (
+                  <Cell key={`pizza-${entrada.nome}`} fill={entrada.cor} />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(valor, nome, item) => [
+                  formatCurrency(valor),
+                  `${nome} (${total > 0 ? ((valor / total) * 100).toFixed(1).replace('.', ',') : 0}%)`,
+                  item,
+                ]}
+                contentStyle={TOOLTIP_STYLE}
+              />
+              <Legend
+                formatter={legendaComValores}
+                wrapperStyle={{ paddingTop: '8px', fontSize: '0.78rem', lineHeight: '1.8' }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function Dashboard() {
   const [data, setData] = useState(null)
@@ -92,9 +167,17 @@ export default function Dashboard() {
     }
   }
 
-  const formatCurrency = (val) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
-  }
+  const montarDadosPizza = (lista, paleta) =>
+    (lista || []).map((item, i) => ({
+      nome: item.categoria,
+      valor: Number(item.total),
+      cor:
+        item.categoria === 'Sem categoria'
+          ? COR_SEM_CATEGORIA
+          : paleta[i % paleta.length],
+    }))
+  const dadosPizzaReceitas = montarDadosPizza(dre?.receitas ?? [], CORES_RECEITAS)
+  const dadosPizzaDespesas = montarDadosPizza(dre?.despesas ?? [], CORES_DESPESAS)
 
   const chartData = data
     ? [
@@ -110,30 +193,6 @@ export default function Dashboard() {
         },
       ]
     : []
-
-  // Dados do gráfico por categoria (DRE): receitas e despesas lado a lado.
-  const categoriasChart = dre
-    ? [
-        ...dre.receitas.map((r, i) => ({
-          categoria: r.categoria,
-          Receitas: Number(r.total),
-          Despesas: 0,
-          cor: CORES_CATEGORIAS[i % CORES_CATEGORIAS.length],
-        })),
-        ...dre.despesas.map((d, i) => {
-          const existente = dre.receitas.findIndex((r) => r.categoria === d.categoria)
-          const cor = existente >= 0 ? CORES_CATEGORIAS[existente % CORES_CATEGORIAS.length] : CORES_CATEGORIAS[i % CORES_CATEGORIAS.length]
-          return {
-            categoria: d.categoria,
-            Receitas: existente >= 0 ? Number(dre.receitas[existente].total) : 0,
-            Despesas: Number(d.total),
-            cor,
-          }
-        }),
-      ]
-    : []
-
-  const exportParams = dre?.periodo?.inicio ? { inicio: dre.periodo.inicio, fim: dre.periodo.fim } : {}
 
   return (
     <Layout>
@@ -232,13 +291,8 @@ export default function Dashboard() {
                   <XAxis dataKey="name" stroke="#94a3b8" tickLine={false} axisLine={{ stroke: '#334155' }} />
                   <YAxis stroke="#94a3b8" tickLine={false} axisLine={{ stroke: '#334155' }} />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#101d20',
-                      borderColor: '#24393e',
-                      borderRadius: '2px',
-                      border: '1px solid #24393e',
-                      color: '#ecf1ef',
-                    }}
+                    formatter={(valor) => formatCurrency(valor)}
+                    contentStyle={TOOLTIP_STYLE}
                   />
                   <Legend wrapperStyle={{ paddingTop: '10px' }} />
                   <Bar dataKey="Entradas" fill="#10b981" radius={[2, 2, 0, 0]} maxBarSize={55} />
@@ -248,7 +302,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* ---------------------------------- DRE: por categoria (gráfico) */}
+          {/* ---------------------------------- DRE: pizzas por categoria */}
           <div className="card-table chart-card-container">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div>
@@ -259,54 +313,24 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {categoriasChart.length === 0 ? (
+            {dadosPizzaReceitas.length === 0 && dadosPizzaDespesas.length === 0 ? (
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                 Nenhuma fatura paga categorizada no período.
               </p>
             ) : (
-              <div style={{ width: '100%', height: 320 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={categoriasChart} margin={{ top: 20, right: 30, left: 10, bottom: 40 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.07)" vertical={false} />
-                    <XAxis
-                      dataKey="categoria"
-                      stroke="#94a3b8"
-                      tickLine={false}
-                      axisLine={{ stroke: '#334155' }}
-                      angle={-20}
-                      textAnchor="end"
-                      interval={0}
-                      height={70}
-                    />
-                    <YAxis
-                      stroke="#94a3b8"
-                      tickLine={false}
-                      axisLine={{ stroke: '#334155' }}
-                      tickFormatter={rotuloMoedaCompacta}
-                    />
-                    <Tooltip
-                      formatter={(value) => formatCurrency(value)}
-                      contentStyle={{
-                        backgroundColor: '#101d20',
-                        borderColor: '#24393e',
-                        borderRadius: '2px',
-                        border: '1px solid #24393e',
-                        color: '#ecf1ef',
-                      }}
-                    />
-                    <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                    <Bar dataKey="Receitas" radius={[2, 2, 0, 0]} maxBarSize={55}>
-                      {categoriasChart.map((entrada, idx) => (
-                        <Cell key={`cell-r-${idx}`} fill={entrada.cor} />
-                      ))}
-                    </Bar>
-                    <Bar dataKey="Despesas" radius={[2, 2, 0, 0]} maxBarSize={55}>
-                      {categoriasChart.map((entrada, idx) => (
-                        <Cell key={`cell-d-${idx}`} fill={entrada.cor} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                <GraficoPizza
+                  titulo="Receitas por Categoria"
+                  corTitulo="var(--accent-success)"
+                  dados={dadosPizzaReceitas}
+                  mensagemVazia="Nenhuma receita paga categorizada no período."
+                />
+                <GraficoPizza
+                  titulo="Despesas por Categoria"
+                  corTitulo="var(--accent-danger)"
+                  dados={dadosPizzaDespesas}
+                  mensagemVazia="Nenhuma despesa paga categorizada no período."
+                />
               </div>
             )}
 

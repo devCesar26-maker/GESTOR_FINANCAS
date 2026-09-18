@@ -298,7 +298,7 @@ export default function Clientes() {
                       : <span className="badge badge-pendente">sem lembretes</span>}
                   </td>
                   <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', columnGap: '6px', justifyContent: 'flex-end' }}>
                       <BotaoWhatsApp cliente={c} />
                       <button
                         className="btn btn-primary btn-sm"

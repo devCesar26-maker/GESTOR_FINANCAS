@@ -12,8 +12,10 @@ from django.utils import timezone
 
 
 class TipoFatura(models.TextChoices):
-    A_RECEBER = "a_receber", "A receber"
-    A_PAGAR = "a_pagar", "A pagar"
+    # Rótulos SEM artigo: a UI (badges, filtros e exportações CSV/PDF)
+    # exibe "Receber"/"Pagar", espelhando o frontend.
+    A_RECEBER = "a_receber", "Receber"
+    A_PAGAR = "a_pagar", "Pagar"
 
 
 class StatusFatura(models.TextChoices):

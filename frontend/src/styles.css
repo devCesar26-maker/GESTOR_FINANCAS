@@ -225,6 +225,13 @@ body {
   overflow: hidden;
 }
 
+/* Scroll horizontal para tabelas largas (ex: botões de ação em faturas
+   pendentes) — em telas estreitas a tabela rola em vez de cortar conteúdo. */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -307,6 +314,28 @@ body {
 .btn-sm {
   padding: 0.4rem 0.8rem;
   font-size: 0.8rem;
+}
+
+/* Botão extra-compacto para células de ação em tabelas: cabe 4+ botões em
+   uma única linha sem esticar a altura do registro. */
+.btn-xs {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.72rem;
+  gap: 0.25rem;
+}
+
+/* Outline neutro para ações de leitura (ex: ver comprovante). Diferente do
+   .btn-logout, cujo hover vermelho indica ação destrutiva. */
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+}
+
+.btn-outline:hover {
+  background-color: var(--bg-card-hover);
+  color: var(--text-main);
+  border-color: var(--text-muted);
 }
 
 /* Forms & Inputs */

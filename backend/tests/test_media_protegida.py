@@ -156,3 +156,45 @@ def test_media_extensao_desconhecida_retorna_404(auth_client, fatura_paga):
     base, _, _ = caminho.rpartition(".")
     response = auth_client.get(f"/media/{base}.exe")
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+# ---------------------------------------------------------------------------
+# 9) Round-trip REAL: upload via /pagar/ -> download via /media/ (bytes íntegros)
+# ---------------------------------------------------------------------------
+# Garante que um comprovante enviado DE VERDADE abre corretamente: o fluxo
+# completo do frontend (POST multipart -> GET blob) devolve exatamente os
+# bytes enviados, com content-type correto. Regressão do "PDF vazio (0 de 0)",
+# que era dado de teste órfão (stub gravado direto no banco), não bug de código.
+
+
+@pytest.mark.django_db
+def test_roundtrip_comprovante_enviado_abre_com_bytes_integros(
+    auth_client, fatura
+):
+    conteudo_original = b"%PDF-1.4\n%roundtrip de comprovante real\n%%EOF\n"
+
+    # 1) Fluxo real de pagamento via API (como o frontend faz).
+    pagamento = auth_client.post(
+        f"/api/faturas/{fatura.id}/pagar/",
+        {
+            "comprovante": SimpleUploadedFile(
+                "comprovante_real.pdf", conteudo_original, "application/pdf"
+            )
+        },
+        format="multipart",
+    )
+    assert pagamento.status_code == status.HTTP_200_OK
+
+    # 2) A URL devolvida é relativa e o caminho existe no storage.
+    url = pagamento.data["comprovante_url"]
+    assert url.startswith("/media/")
+    caminho = url[len("/media/"):]
+    fatura.refresh_from_db()
+    assert fatura.comprovante.name == caminho
+    assert fatura.comprovante.storage.exists(caminho)
+
+    # 3) Download autenticado devolve os MESMOS bytes enviados.
+    download = auth_client.get(url)
+    assert download.status_code == status.HTTP_200_OK
+    assert download["Content-Type"] == "application/pdf"
+    assert b"".join(download.streaming_content) == conteudo_original

@@ -13,7 +13,7 @@ function BotaoCobrancaWhatsApp({ fatura }) {
   if (link) {
     return (
       <a
-        className="btn btn-success btn-sm"
+        className="btn btn-success btn-xs"
         href={link}
         target="_blank"
         rel="noopener noreferrer"
@@ -27,7 +27,7 @@ function BotaoCobrancaWhatsApp({ fatura }) {
 
   return (
     <button
-      className="btn btn-success btn-sm"
+      className="btn btn-success btn-xs"
       disabled
       title={
         fatura.cliente_telefone
@@ -414,8 +414,8 @@ export default function Faturas() {
             aria-label="Filtrar por tipo"
           >
             <option value="">Tipo: todos</option>
-            <option value="a_receber">A Receber</option>
-            <option value="a_pagar">A Pagar</option>
+            <option value="a_receber">Receber</option>
+            <option value="a_pagar">Pagar</option>
           </select>
 
           <input
@@ -449,6 +449,9 @@ export default function Faturas() {
       </div>
 
       <div className="card-table">
+        {/* table-scroll: em telas estreitas a tabela rola na horizontal em vez
+            de cortar o último botão de ação na borda do card. */}
+        <div className="table-scroll">
         <table className="data-table">
           <thead>
             <tr>
@@ -481,7 +484,7 @@ export default function Faturas() {
                   <td>{f.descricao || '—'}</td>
                   <td style={{ minWidth: '90px' }}>
                     <span style={{ color: f.tipo === 'a_receber' ? 'var(--accent-success)' : 'var(--accent-danger)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                      {f.tipo === 'a_receber' ? 'A Receber' : 'A Pagar'}
+                      {f.tipo === 'a_receber' ? 'Receber' : 'Pagar'}
                     </span>
                   </td>
                   <td>{f.vencimento}</td>
@@ -491,23 +494,29 @@ export default function Faturas() {
                       {f.status}
                     </span>
                   </td>
+                  {/* Linha ÚNICA e compacta: flex row + nowrap com botões xs
+                      mantém 💬, Receber, Editar e Cancelar na mesma linha,
+                      sem esticar a altura do registro nem empilhar. Em telas
+                      estreitas o container .table-scroll rola na horizontal. */}
                   <td style={{ textAlign: 'right' }}>
                     <div
                       style={{
                         display: 'flex',
-                        gap: '8px',
+                        flexDirection: 'row',
+                        gap: '0.5rem',
                         alignItems: 'center',
                         justifyContent: 'flex-end',
-                        flexWrap: 'nowrap',
+                        whiteSpace: 'nowrap',
                       }}
                     >
                       {/* Faturas PAGAS: somente leitura + ver comprovante 📎 */}
                       {f.status === 'paga' && f.comprovante_url && (
                         <button
-                          className="btn btn-logout btn-sm"
+                          className="btn btn-outline btn-xs"
                           onClick={() => abrirComprovante(f)}
                           disabled={baixandoComprovante}
-                          title="Ver comprovante de pagamento"
+                          title="Visualizar Comprovante de Pagamento"
+                          aria-label="Visualizar Comprovante de Pagamento"
                         >
                           📎 Comprovante
                         </button>
@@ -516,20 +525,20 @@ export default function Faturas() {
                         <>
                           {f.tipo === 'a_receber' && <BotaoCobrancaWhatsApp fatura={f} />}
                           <button
-                            className="btn btn-success btn-sm"
+                            className="btn btn-success btn-xs"
                             onClick={() => abrirModalPagar(f)}
                           >
                             {f.tipo === 'a_pagar' ? 'Pagar' : 'Receber'}
                           </button>
                           <button
-                            className="btn btn-primary btn-sm"
+                            className="btn btn-primary btn-xs"
                             onClick={() => abrirModalEdicao(f)}
                             title="Editar fatura"
                           >
                             Editar
                           </button>
                           <button
-                            className="btn btn-danger btn-sm"
+                            className="btn btn-danger btn-xs"
                             onClick={() => setFaturaParaCancelar(f)}
                           >
                             Cancelar
@@ -540,7 +549,7 @@ export default function Faturas() {
                         <>
                           {f.tipo === 'a_receber' && <BotaoCobrancaWhatsApp fatura={f} />}
                           <button
-                            className="btn btn-success btn-sm"
+                            className="btn btn-success btn-xs"
                             onClick={() => abrirModalPagar(f)}
                           >
                             {f.tipo === 'a_pagar' ? 'Pagar' : 'Receber'}
@@ -554,6 +563,7 @@ export default function Faturas() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {faturaParaCancelar && (
@@ -723,8 +733,8 @@ export default function Faturas() {
                     value={formData.tipo}
                     onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
                   >
-                    <option value="a_receber">A Receber</option>
-                    <option value="a_pagar">A Pagar</option>
+                    <option value="a_receber">Receber</option>
+                    <option value="a_pagar">Pagar</option>
                   </select>
                 </div>
                 <div className="form-group">
