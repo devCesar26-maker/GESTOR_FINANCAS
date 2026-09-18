@@ -64,6 +64,12 @@ class ClienteSerializer(serializers.ModelSerializer):
         Assim o e-mail, por exemplo, já chega limpo de tags ao EmailField —
         "<b>maria</b>@ex.com" é validado como "maria@ex.com", e não rejeitado
         por conter marcação.
+
+        Documento mascarado (LGPD): se o cliente chegar com "*" (ex.:
+        "529.***.***-25", devolvido pela listagem), o valor não representa um
+        documento real — em edição, o campo é descartado para preservar o
+        original salvo no banco. Na criação (sem instância), um mascarado é
+        rejeitado: não existe "original" para preservar.
         """
         if hasattr(data, "items"):
             dados = dict(data)
@@ -71,6 +77,17 @@ class ClienteSerializer(serializers.ModelSerializer):
                 valor = dados.get(campo)
                 if isinstance(valor, str):
                     dados[campo] = _strip_tags(valor)
+            if "*" in (dados.get("documento") or ""):
+                if self.instance is not None and self.instance.documento:
+                    # PUT/PATCH com o documento mascarado da listagem:
+                    # substitui pelo valor original da base — a chave permanece
+                    # no payload (PUT exige todos os campos), mas o valor
+                    # validado/salvo é o já existente.
+                    dados["documento"] = self.instance.documento
+                else:
+                    # Criação (sem instância): não há original a preservar.
+                    # Zera para cair na mensagem "documento é obrigatório".
+                    dados["documento"] = ""
             data = dados
         return super().to_internal_value(data)
 

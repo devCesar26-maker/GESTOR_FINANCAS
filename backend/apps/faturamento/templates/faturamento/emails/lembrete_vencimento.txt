@@ -1,12 +1,16 @@
-Olá, {{ cliente_nome }},
+Prezado(a) {{ cliente_nome }},
 
-A fatura {{ numero }} vence HOJE.
+A fatura {{ numero }} vence HOJE, {{ vencimento }}. Solicitamos a realização do pagamento na data de hoje e, após efetuá-lo, o envio do comprovante por este canal ou pelo painel FinFlow.
 
-  Valor:      R$ {{ valor }}
-  Vencimento: hoje, {{ vencimento }}
-  Descrição:  {{ descricao }}
+  Número da fatura: {{ numero }}
+  Valor:            R$ {{ valor }}
+  Vencimento:       hoje, {{ vencimento }}
+  Descrição:        {{ descricao }}
 
-Caso já tenha pago, desconsidere esta mensagem.
+{{ dados_pagamento }}
+
+Caso o pagamento já tenha sido realizado, por favor desconsidere este aviso.
 
 Atenciosamente,
 {{ remetente }}
+FinFlow — Gestão Financeira

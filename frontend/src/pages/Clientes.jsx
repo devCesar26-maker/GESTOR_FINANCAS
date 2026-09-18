@@ -116,6 +116,13 @@ export default function Clientes() {
         formData.tipo_pessoa === 'pf'
           ? 'O CPF é obrigatório.'
           : 'O CNPJ é obrigatório.'
+    } else if (
+      clienteEditando &&
+      formData.documento === clienteEditando.documento &&
+      formData.documento.includes('*')
+    ) {
+      // Documento mascarado da listagem (LGPD), intacto: sem validação local.
+      // O backend preserva o valor original salvo na base.
     } else if (formData.tipo_pessoa === 'pf') {
       const digitos = formData.documento.replace(/\D/g, '')
       if (digitos.length !== 11) {
@@ -173,7 +180,10 @@ export default function Clientes() {
     setSubmitting(true)
     try {
       if (clienteEditando) {
-        // Edição: PUT /api/clientes/{id}/ com payload completo.
+        // Edição: PUT /api/clientes/{id}/ com payload completo. Se o documento
+        // permaneceu como veio da listagem (mascarado por LGPD), segue no
+        // payload: o serializer do backend detecta o "*" e preserva o valor
+        // original salvo na base, sem erro de validação.
         await api.put(`/clientes/${clienteEditando.id}/`, formData)
       } else {
         await api.post('/clientes/', formData)

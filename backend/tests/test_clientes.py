@@ -100,6 +100,66 @@ def test_documento_incompativel_com_tipo_pessoa_e_rejeitado(auth_client):
 
 
 # ---------------------------------------------------------------------------
+# Edição com documento mascarado (LGPD) — deve manter o valor original
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_put_com_documento_mascarado_mantem_original(auth_client, user):
+    """PUT devolvendo o CPF mascarado da listagem preserva o documento real."""
+    cliente = Cliente.objects.create(
+        nome="Cliente LGPD",
+        tipo_pessoa=TipoPessoa.FISICA,
+        documento=CPF_VALIDO,
+        owner=user,
+    )
+    mascarado = "529.***.***-25"  # exatamente como a listagem devolve
+
+    response = auth_client.put(
+        f"{URL}{cliente.pk}/",
+        payload_cliente(nome="Cliente LGPD Editado", documento=mascarado),
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    cliente.refresh_from_db()
+    assert cliente.documento == CPF_VALIDO  # original intacto
+    assert cliente.nome == "Cliente LGPD Editado"  # demais campos aplicados
+
+
+@pytest.mark.django_db
+def test_patch_com_documento_mascarado_mantem_original(auth_client, user):
+    """PATCH com o CNPJ mascarado (ex.: **.***.247/0001-**) não altera o campo."""
+    cliente = Cliente.objects.create(
+        nome="Empresa ABC",
+        tipo_pessoa=TipoPessoa.JURIDICA,
+        documento=CNPJ_VALIDO,
+        owner=user,
+    )
+    mascarado = "**.***.333/0001-**"  # formato da listagem para CNPJ
+
+    response = auth_client.patch(
+        f"{URL}{cliente.pk}/", {"documento": mascarado}, format="json"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    cliente.refresh_from_db()
+    assert cliente.documento == CNPJ_VALIDO
+
+
+@pytest.mark.django_db
+def test_documento_mascarado_sem_instancia_e_rejeitado(auth_client):
+    """Na criação, documento mascarado não representa dado real -> 400."""
+    response = auth_client.post(
+        URL, payload_cliente(documento="529.***.***-25"), format="json"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "documento" in response.data
+    assert not Cliente.objects.filter(nome="Maria Silva").exists()
+
+
+# ---------------------------------------------------------------------------
 # Mascaramento LGPD (Listagem vs Detalhe)
 # ---------------------------------------------------------------------------
 

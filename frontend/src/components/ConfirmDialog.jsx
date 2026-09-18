@@ -7,6 +7,10 @@ import { useEffect } from 'react'
  * - titulo: string exibida no cabeçalho do modal
  * - mensagem: texto explicativo da ação
  * - textoConfirmar: rótulo do botão de confirmação (default "Confirmar")
+ * - textoCancelar: rótulo do botão de cancelar (default "Voltar")
+ * - textoProcessando: rótulo exibido durante o processamento (default "Processando...")
+ * - variante: classe do botão de confirmação (default "btn-danger";
+ *   use "btn-primary" para ações não destrutivas, ex.: logout)
  * - aoConfirmar: callback executado ao confirmar
  * - aoCancelar: callback executado ao cancelar/fechar
  * - processando: desabilita os botões enquanto a ação roda (evita duplo clique)
@@ -15,6 +19,9 @@ export default function ConfirmDialog({
   titulo,
   mensagem,
   textoConfirmar = 'Confirmar',
+  textoCancelar = 'Voltar',
+  textoProcessando = 'Processando...',
+  variante = 'btn-danger',
   aoConfirmar,
   aoCancelar,
   processando = false,
@@ -52,15 +59,15 @@ export default function ConfirmDialog({
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
           <button className="btn btn-logout" onClick={aoCancelar} disabled={processando}>
-            Voltar
+            {textoCancelar}
           </button>
           <button
-            className="btn btn-danger"
+            className={`btn ${variante}`}
             onClick={aoConfirmar}
             disabled={processando}
             autoFocus
           >
-            {processando ? 'Processando...' : textoConfirmar}
+            {processando ? textoProcessando : textoConfirmar}
           </button>
         </div>
       </div>

@@ -1,12 +1,18 @@
-Olá, {{ cliente_nome }},
+Prezado(a) {{ cliente_nome }},
 
-Passando para lembrar que a fatura {{ numero }} vence{% if dias == 1 %} amanhã{% else %} em {{ dias }} dias{% endif %}.
+Tudo bem? Passando para lembrar que a fatura {{ numero }} vence{% if dias == 1 %} amanhã ({{ vencimento }}){% else %} em {{ dias }} dias, em {{ vencimento }}{% endif %}.
 
-  Valor:      R$ {{ valor }}
-  Vencimento: {{ vencimento }}
-  Descrição:  {{ descricao }}
+  Número da fatura: {{ numero }}
+  Valor:            R$ {{ valor }}
+  Vencimento:       {{ vencimento }}
+  Descrição:        {{ descricao }}
 
-Se o pagamento já foi efetuado, por favor desconsidere este aviso.
+{{ dados_pagamento }}
+
+Este é um lembrete preventivo — ainda há tempo hábil para o pagamento sem quaisquer encargos.
+
+Agradecemos a atenção e permanecemos à disposição para qualquer esclarecimento.
 
 Atenciosamente,
 {{ remetente }}
+FinFlow — Gestão Financeira

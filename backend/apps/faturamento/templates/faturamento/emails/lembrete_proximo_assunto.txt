@@ -1,0 +1,1 @@
+Vencimento próximo: fatura {{ numero }} — R$ {{ valor }} ({{ vencimento }})

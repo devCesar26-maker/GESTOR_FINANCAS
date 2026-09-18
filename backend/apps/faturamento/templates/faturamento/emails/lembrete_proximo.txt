@@ -1,0 +1,18 @@
+Prezado(a) {{ cliente_nome }},
+
+Informamos que a fatura {{ numero }} vence{% if dias == 1 %} amanhã, {{ vencimento }}{% else %} em {{ dias }} dias, em {{ vencimento }}{% endif %}. Solicitamos, por gentileza, a programação do pagamento até a data indicada.
+
+  Número da fatura: {{ numero }}
+  Valor:            R$ {{ valor }}
+  Vencimento:       {{ vencimento }}
+  Descrição:        {{ descricao }}
+
+{{ dados_pagamento }}
+
+Caso o pagamento já tenha sido realizado, por favor desconsidere esta notificação.
+
+Eventuais dúvidas poderão ser encaminhadas respondendo a este e-mail.
+
+Atenciosamente,
+{{ remetente }}
+FinFlow — Gestão Financeira

@@ -200,6 +200,14 @@ DEFAULT_FROM_EMAIL = os.getenv(
     "DEFAULT_FROM_EMAIL", "FinFlow <projetodefinancas34@gmail.com>"
 )
 
+# Dados de pagamento incluídos no corpo dos lembretes de cobrança (réguas
+# 10/5/1/0 dias). A chave PIX é lida do ambiente; sem ela, o e-mail informa
+# que os dados bancários podem ser solicitados respondendo à mensagem.
+DADOS_PAGAMENTO = {
+    "chave_pix": os.getenv("FINFLOW_CHAVE_PIX", ""),
+    "favorecido": os.getenv("FINFLOW_FAVORECIDO_PIX", ""),
+}
+
 # Lembretes de vencimento: janelas de disparo em dias antes do vencimento.
 # Prévios em 10/5/1 dias + aviso no dia do vencimento (0). A grafia legada
 # "LEMRETE" é mantida nas variáveis já existentes.

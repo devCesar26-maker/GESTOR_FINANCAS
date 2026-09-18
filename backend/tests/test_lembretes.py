@@ -74,7 +74,11 @@ def _fatura_vence_em(cliente, owner, dias, numero="FAT-LEM-PREV"):
 @pytest.mark.django_db
 @pytest.mark.parametrize("dias", JANELAS)
 def test_envia_lembrete_previo_em_cada_janela(mailoutbox, cliente_com_email, user, dias):
-    """Cada janela prévia (10, 5 e 1 dias) dispara o e-mail correspondente."""
+    """Cada janela prévia (10, 5 e 1 dias) dispara o e-mail da sua régua.
+
+    Réguas: 10 dias = lembrete preventivo amigável; 5 e 1 dia(s) =
+    notificação formal de vencimento próximo (templates distintos).
+    """
     _fatura_vence_em(cliente_com_email, user, dias, numero=f"FAT-J{dias}")
 
     resultado = services.enviar_lembretes_vencimento()
@@ -84,11 +88,19 @@ def test_envia_lembrete_previo_em_cada_janela(mailoutbox, cliente_com_email, use
 
     email = mailoutbox[0]
     assert email.to == ["maria@cliente.com"]
-    if dias == 1:
-        esperado = f"FAT-J{dias} vence amanhã"
-    else:
+    if dias >= 10:
+        # Régua preventiva (10 dias)
         esperado = f"FAT-J{dias} vence em {dias} dias"
-    assert esperado in email.subject
+        assert esperado in email.subject
+        assert "lembrete preventivo" in email.body
+    elif dias == 1:
+        # Régua formal (1 dia)
+        assert "Vencimento próximo: fatura FAT-J1" in email.subject
+        assert "vence amanhã" in email.body
+    else:
+        # Régua formal (5 dias)
+        assert f"Vencimento próximo: fatura FAT-J{dias}" in email.subject
+        assert f"em {dias} dias" in email.body
     # DecimalField é localizado pelo Django (pt-BR): vírgula como separador decimal.
     assert "R$ 350,00" in email.body
     assert "Maria Cliente" in email.body
@@ -107,6 +119,76 @@ def test_envia_lembrete_de_vencimento_hoje(mailoutbox, cliente_com_email, user):
     email = mailoutbox[0]
     assert email.to == ["maria@cliente.com"]
     assert "FAT-LEM-HOJE" in email.subject
+
+
+# ---------------------------------------------------------------------------
+# Tom corporativo por régua + dados de pagamento (PIX) no corpo
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_corpo_inclui_dados_completos_e_pix(mailoutbox, cliente_com_email, user, settings):
+    """Corpo traz nome, fatura, valor R$, vencimento e a chave PIX configurada."""
+    settings.DADOS_PAGAMENTO = {
+        "chave_pix": "pagamentos@finflow.com",
+        "favorecido": "FinFlow LTDA",
+    }
+    _fatura_vence_em(cliente_com_email, user, 0, numero="FAT-PIX")
+
+    services.enviar_lembretes_vencimento()
+
+    corpo = mailoutbox[0].body
+    assert "Maria Cliente" in corpo            # nome do cliente
+    assert "FAT-PIX" in corpo                  # número da fatura
+    assert "R$ 350,00" in corpo                # valor formatado
+    assert "Vencimento:" in corpo              # data de vencimento
+    assert "Chave PIX: pagamentos@finflow.com" in corpo
+    assert "Favorecido: FinFlow LTDA" in corpo
+    assert "comprovante" in corpo.lower()      # instrução de envio
+
+
+@pytest.mark.django_db
+def test_corpo_sem_chave_pix_orienta_solicitar_dados(
+    mailoutbox, cliente_com_email, user, settings
+):
+    """Sem chave PIX configurada, o e-mail orienta a solicitar os dados."""
+    settings.DADOS_PAGAMENTO = {"chave_pix": "", "favorecido": ""}
+    _fatura_vence_em(cliente_com_email, user, 5, numero="FAT-SEM-PIX")
+
+    services.enviar_lembretes_vencimento()
+
+    corpo = mailoutbox[0].body
+    assert "Chave PIX:" not in corpo
+    assert "podem ser solicitados" in corpo
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("dias", "trecho"),
+    [(10, "lembrete preventivo"), (5, "Solicitamos, por gentileza"), (1, "vence amanhã")],
+)
+def test_tom_por_regua_de_vencimento(
+    mailoutbox, cliente_com_email, user, dias, trecho
+):
+    """10d preventivo amigável; 5d/1d notificação formal; 0d com comprovante."""
+    _fatura_vence_em(cliente_com_email, user, dias, numero=f"FAT-TOM-{dias}")
+
+    services.enviar_lembretes_vencimento()
+
+    assert trecho in mailoutbox[0].body
+
+
+@pytest.mark.django_db
+def test_vencimento_hoje_pede_envio_de_comprovante(
+    mailoutbox, cliente_com_email, user
+):
+    _fatura_vence_em(cliente_com_email, user, 0, numero="FAT-COMPROVANTE")
+
+    services.enviar_lembretes_vencimento()
+
+    corpo = mailoutbox[0].body
+    assert "vence HOJE" in corpo
+    assert "envio do comprovante" in corpo
 
 
 @pytest.mark.django_db

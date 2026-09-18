@@ -245,11 +245,54 @@ def _assinatura_do_dono(fatura: Fatura) -> str:
     return dono.get_full_name() or dono.get_username()
 
 
+def _dados_pagamento() -> dict:
+    """Dados de pagamento (PIX) incluídos nos lembretes, via settings.
+
+    Sobrescrevível nos testes com ``override_settings``.
+    """
+    return getattr(settings, "DADOS_PAGAMENTO", {}) or {}
+
+
+def _bloco_pagamento(fatura: Fatura) -> str:
+    """Monta o bloco "Dados para pagamento" do corpo do e-mail.
+
+    Inclui a chave PIX quando configurada (settings.DADOS_PAGAMENTO, via
+    variáveis de ambiente FINFLOW_CHAVE_PIX/FINFLOW_FAVORECIDO_PIX); sem
+    chave configurada, orienta o destinatário a solicitar os dados ao
+    respondendo a mensagem.
+    """
+    dados = _dados_pagamento()
+    chave_pix = (dados.get("chave_pix") or "").strip()
+    favorecido = (dados.get("favorecido") or "").strip()
+
+    linhas = ["Dados para pagamento:"]
+    if chave_pix:
+        linhas.append(f"  Chave PIX: {chave_pix}")
+        if favorecido:
+            linhas.append(f"  Favorecido: {favorecido}")
+    else:
+        linhas.append(
+            "  A chave PIX e os dados bancários podem ser solicitados "
+            "respondendo a este e-mail."
+        )
+    linhas.append(
+        "  Após o pagamento, envie o comprovante por este canal ou "
+        "pelo painel FinFlow."
+    )
+    return "\n".join(linhas)
+
+
 def _enviar_lembrete(fatura: Fatura, *, dias_ate_vencimento: int) -> None:
     """Envia o e-mail do lembrete e grava a data de envio na fatura.
 
     A data só é gravada DEPOIS de um envio bem-sucedido — se o send falhar,
     a exceção propaga sem registro, e a próxima execução tenta de novo.
+
+    Tom corporativo por janela da régua de vencimento:
+      - 10 dias: lembrete preventivo amigável;
+      - 5 e 1 dia(s): notificação formal de vencimento próximo;
+      - 0 dias (vence hoje): aviso de vencimento com instrução clara de
+        envio do comprovante.
     """
     vence_hoje = dias_ate_vencimento <= 0
     contexto = {
@@ -260,14 +303,21 @@ def _enviar_lembrete(fatura: Fatura, *, dias_ate_vencimento: int) -> None:
         "descricao": fatura.descricao or "—",
         "dias": dias_ate_vencimento,
         "remetente": _assinatura_do_dono(fatura),
+        "dados_pagamento": _bloco_pagamento(fatura),
     }
     if vence_hoje:
         assunto_tmpl = "faturamento/emails/lembrete_vencimento_assunto.txt"
         corpo_tmpl = "faturamento/emails/lembrete_vencimento.txt"
         campo = "lembrete_vencimento_enviado_em"
-    else:
+    elif dias_ate_vencimento >= 10:
+        # Janela preventiva (10 dias): template amigável.
         assunto_tmpl = "faturamento/emails/lembrete_previo_assunto.txt"
         corpo_tmpl = "faturamento/emails/lembrete_previo.txt"
+        campo = "lembrete_previo_enviado_em"
+    else:
+        # Janelas formais (5 e 1 dias): template de vencimento próximo.
+        assunto_tmpl = "faturamento/emails/lembrete_proximo_assunto.txt"
+        corpo_tmpl = "faturamento/emails/lembrete_proximo.txt"
         campo = "lembrete_previo_enviado_em"
 
     assunto = render_to_string(assunto_tmpl, contexto).strip()
