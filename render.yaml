@@ -1,0 +1,185 @@
+services:
+  # --- BACKEND (Django API) ---
+  - type: web
+    name: finflow-backend
+    env: docker
+    dockerfilePath: ./backend/Dockerfile.prod
+    dockerContext: ./backend
+    region: oregon
+    plan: starter
+    healthCheckPath: /admin/login/
+    # Persistent Disk para manter os comprovantes em /media
+    disk:
+      name: finflow-media
+      mountPath: /app/media
+      sizeGB: 1
+    envVars:
+      - key: DEBUG
+        value: "false"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        value: finflow-backend.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://finflow-frontend.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://finflow-frontend.onrender.com
+      - key: DB_ENGINE
+        value: django.db.backends.postgresql
+      - key: DB_HOST
+        fromDatabase:
+          name: finflow-db
+          property: host
+      - key: DB_NAME
+        fromDatabase:
+          name: finflow-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: finflow-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: finflow-db
+          property: password
+      - key: DB_PORT
+        fromDatabase:
+          name: finflow-db
+          property: port
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: finflow-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: finflow-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: redis
+          name: finflow-redis
+          property: connectionString
+      - key: BREVO_API_KEY
+        sync: false # Pede o valor manualmente no painel para nao expor no Git
+      - key: DEFAULT_FROM_EMAIL
+        value: FinFlow <projetodefinancas34@gmail.com>
+      - key: LEMRETE_DIAS_ANTES
+        value: "10,5,1,0"
+
+  # --- CELERY WORKER ---
+  - type: worker
+    name: finflow-worker
+    env: docker
+    dockerfilePath: ./backend/Dockerfile.prod
+    dockerContext: ./backend
+    dockerCommand: celery -A finflow worker -l info
+    disk:
+      name: finflow-media
+      mountPath: /app/media
+      sizeGB: 1
+    envVars:
+      - key: DEBUG
+        value: "false"
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: finflow-backend
+          property: SECRET_KEY
+      - key: DB_ENGINE
+        value: django.db.backends.postgresql
+      - key: DB_HOST
+        fromDatabase:
+          name: finflow-db
+          property: host
+      - key: DB_NAME
+        fromDatabase:
+          name: finflow-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: finflow-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: finflow-db
+          property: password
+      - key: DB_PORT
+        fromDatabase:
+          name: finflow-db
+          property: port
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: finflow-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: redis
+          name: finflow-redis
+          property: connectionString
+      - key: BREVO_API_KEY
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        value: FinFlow <projetodefinancas34@gmail.com>
+
+  # --- CELERY BEAT ---
+  - type: worker
+    name: finflow-beat
+    env: docker
+    dockerfilePath: ./backend/Dockerfile.prod
+    dockerContext: ./backend
+    dockerCommand: celery -A finflow beat -l info
+    envVars:
+      - key: DEBUG
+        value: "false"
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: finflow-backend
+          property: SECRET_KEY
+      - key: DB_ENGINE
+        value: django.db.backends.postgresql
+      - key: DB_HOST
+        fromDatabase:
+          name: finflow-db
+          property: host
+      - key: DB_NAME
+        fromDatabase:
+          name: finflow-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: finflow-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: finflow-db
+          property: password
+      - key: DB_PORT
+        fromDatabase:
+          name: finflow-db
+          property: port
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: finflow-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: redis
+          name: finflow-redis
+          property: connectionString
+
+  # --- REDIS MEMORY INSTANCE ---
+  - type: redis
+    name: finflow-redis
+    ipAllowList: [] # Conexão privada restrita aos containers internos
+
+databases:
+  # --- POSTGRESQL GERENCIADO ---
+  - name: finflow-db
+    databaseName: FINANCEIRO
+    user: postgres
+    plan: starter
