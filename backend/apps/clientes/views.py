@@ -5,23 +5,42 @@ import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, viewsets
 
-from .models import Cliente
+from .models import Cliente, Papel
 from .serializers import ClienteDetailSerializer, ClienteListSerializer
 
 logger = logging.getLogger(__name__)
 
 
 class ClienteFilter(django_filters.FilterSet):
-    """Filtros de clientes: nome/documento por trecho + campos exatos."""
+    """Filtros de clientes: nome/documento por trecho + campos exatos.
+
+    O filtro `papel` é SEMÂNTICO: um cliente registrado com papel="ambos"
+    aparece tanto em ?papel=cliente quanto em ?papel=fornecedor (ele exerce
+    os dois papéis). ?papel=ambos traz apenas quem foi registrado com esse
+    valor; qualquer outro valor não reconhecido devolve lista vazia.
+    """
 
     nome = django_filters.CharFilter(field_name="nome", lookup_expr="icontains")
     documento = django_filters.CharFilter(
         field_name="documento", lookup_expr="icontains"
     )
+    papel = django_filters.CharFilter(method="filtrar_papel")
+
+    def filtrar_papel(self, queryset, name, value):
+        value = (value or "").strip().lower()
+        if not value:
+            return queryset
+        if value == Papel.AMBOS:
+            return queryset.filter(papel=Papel.AMBOS)
+        if value in (Papel.CLIENTE, Papel.FORNECEDOR):
+            return queryset.filter(papel__in=[value, Papel.AMBOS])
+        # Valor inválido: mantém o comportamento do filtro exato anterior —
+        # não existe cliente com esse papel, logo lista vazia.
+        return queryset.none()
 
     class Meta:
         model = Cliente
-        fields = ("nome", "documento", "papel", "tipo_pessoa", "ativo")
+        fields = ("nome", "documento", "tipo_pessoa", "ativo")
 
 
 class ClienteViewSet(viewsets.ModelViewSet):

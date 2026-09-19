@@ -279,6 +279,12 @@ body {
 .badge-vencida { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
 .badge-cancelada { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); }
 
+/* Papel "ambos" (cliente E fornecedor): badge neutro com os dois pontos de cor */
+.badge-ambos { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); gap: 0.35rem; }
+.papel-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.papel-dot-verde { background: #34d399; }
+.papel-dot-laranja { background: #fbbf24; }
+
 /* Buttons */
 .btn {
   display: inline-flex;

@@ -9,10 +9,17 @@ from django.db import models
 
 
 class Papel(models.TextChoices):
-    """Papel do contato no negócio: cliente ou fornecedor."""
+    """Papel do contato no negócio: cliente, fornecedor ou ambos.
+
+    "ambos" cobre a entidade que é cliente E fornecedor do mesmo gestor
+    (ex.: uma gráfica que vende material gráfico ao gestor e também
+    prestação de serviço a ele). Faturas a_receber E a_pagar podem
+    referenciá-la — não há vínculo entre papel do cliente e tipo da fatura.
+    """
 
     CLIENTE = "cliente", "Cliente"
     FORNECEDOR = "fornecedor", "Fornecedor"
+    AMBOS = "ambos", "Cliente/Fornecedor"
 
 
 class TipoPessoa(models.TextChoices):

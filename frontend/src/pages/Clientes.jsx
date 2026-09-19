@@ -41,6 +41,28 @@ function BotaoWhatsApp({ cliente }) {
   )
 }
 
+// Badge do campo Papel na listagem.
+// - cliente: verde (mesma cor de status positivo)
+// - fornecedor: laranja
+// - ambos: entidade que é cliente E fornecedor do mesmo gestor — badge
+//   neutro com os dois pontos de cor e rótulo explícito "Cliente/Fornecedor".
+export function BadgePapel({ papel }) {
+  if (papel === 'ambos') {
+    return (
+      <span className="badge badge-ambos" title="Atua como cliente e fornecedor">
+        <span className="papel-dot papel-dot-verde" aria-hidden="true"></span>
+        <span className="papel-dot papel-dot-laranja" aria-hidden="true"></span>
+        Cliente/Fornecedor
+      </span>
+    )
+  }
+  return (
+    <span className={`badge ${papel === 'fornecedor' ? 'badge-pendente' : 'badge-paga'}`}>
+      {papel === 'fornecedor' ? 'Fornecedor' : 'Cliente'}
+    </span>
+  )
+}
+
 const FORMULARIO_VAZIO = {
   nome: '',
   papel: 'cliente',
@@ -295,9 +317,7 @@ export default function Clientes() {
                 <tr key={c.id}>
                   <td style={{ fontWeight: 600 }}>{c.nome}</td>
                   <td>
-                    <span className={`badge ${c.papel === 'cliente' ? 'badge-paga' : 'badge-pendente'}`}>
-                      {c.papel}
-                    </span>
+                    <BadgePapel papel={c.papel} />
                   </td>
                   <td>{c.tipo_pessoa === 'pf' ? 'Pessoa Física' : 'Pessoa Jurídica'}</td>
                   <td>{c.documento || '—'}</td>
