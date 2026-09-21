@@ -8,7 +8,6 @@ services:
     region: oregon
     plan: starter
     healthCheckPath: /admin/login/
-    # Persistent Disk para manter os comprovantes em /media
     disk:
       name: finflow-media
       mountPath: /app/media
@@ -62,10 +61,10 @@ services:
           name: finflow-redis
           property: connectionString
       - key: BREVO_API_KEY
-        sync: false # Pede o valor manualmente no painel para nao expor no Git
+        sync: false
       - key: DEFAULT_FROM_EMAIL
         value: FinFlow <projetodefinancas34@gmail.com>
-      - key: LEMRETE_DIAS_ANTES
+      - key: LEMBRETE_DIAS_ANTES
         value: "10,5,1,0"
 
   # --- CELERY WORKER ---
@@ -75,10 +74,6 @@ services:
     dockerfilePath: ./backend/Dockerfile.prod
     dockerContext: ./backend
     dockerCommand: celery -A finflow worker -l info
-    disk:
-      name: finflow-media
-      mountPath: /app/media
-      sizeGB: 1
     envVars:
       - key: DEBUG
         value: "false"
@@ -86,7 +81,7 @@ services:
         fromService:
           type: web
           name: finflow-backend
-          property: SECRET_KEY
+          envVarKey: SECRET_KEY
       - key: DB_ENGINE
         value: django.db.backends.postgresql
       - key: DB_HOST
@@ -109,6 +104,11 @@ services:
         fromDatabase:
           name: finflow-db
           property: port
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: finflow-redis
+          property: connectionString
       - key: CELERY_BROKER_URL
         fromService:
           type: redis
@@ -138,7 +138,7 @@ services:
         fromService:
           type: web
           name: finflow-backend
-          property: SECRET_KEY
+          envVarKey: SECRET_KEY
       - key: DB_ENGINE
         value: django.db.backends.postgresql
       - key: DB_HOST
@@ -161,6 +161,11 @@ services:
         fromDatabase:
           name: finflow-db
           property: port
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: finflow-redis
+          property: connectionString
       - key: CELERY_BROKER_URL
         fromService:
           type: redis
@@ -172,14 +177,28 @@ services:
           name: finflow-redis
           property: connectionString
 
+  # --- FRONTEND (React Static Site) ---
+  - type: web
+    name: finflow-frontend
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://finflow-backend.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
   # --- REDIS MEMORY INSTANCE ---
   - type: redis
     name: finflow-redis
-    ipAllowList: [] # Conexão privada restrita aos containers internos
+    ipAllowList: []
 
 databases:
   # --- POSTGRESQL GERENCIADO ---
   - name: finflow-db
-    databaseName: FINANCEIRO
-    user: postgres
+    databaseName: financeiro
+    user: finflow_user
     plan: starter
