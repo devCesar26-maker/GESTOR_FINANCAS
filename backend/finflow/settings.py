@@ -61,6 +61,11 @@ INSTALLED_APPS = [
     "apps.relatorios",
 ]
 
+CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "")
+if CLOUDINARY_CLOUD_NAME:
+    INSTALLED_APPS.insert(0, "cloudinary_storage")
+    INSTALLED_APPS.insert(1, "cloudinary")
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "finflow.middleware.MaxBodySizeMiddleware",
@@ -270,6 +275,15 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # Uploads de usuário (comprovantes de pagamento de faturas).
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+if CLOUDINARY_CLOUD_NAME:
+    CLOUDINARY_STORAGE = {
+        "CLOUD_NAME": CLOUDINARY_CLOUD_NAME,
+        "API_KEY": os.getenv("CLOUDINARY_API_KEY", ""),
+        "API_SECRET": os.getenv("CLOUDINARY_API_SECRET", ""),
+    }
+    DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+
 # Tamanho máximo de cada comprovante enviado em /api/faturas/{id}/pagar/.
 COMPROVANTE_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
 

@@ -8,10 +8,6 @@ services:
     region: oregon
     plan: starter
     healthCheckPath: /admin/login/
-    disk:
-      name: finflow-media
-      mountPath: /app/media
-      sizeGB: 1
     envVars:
       - key: DEBUG
         value: "false"
@@ -66,6 +62,12 @@ services:
         value: FinFlow <projetodefinancas34@gmail.com>
       - key: LEMBRETE_DIAS_ANTES
         value: "10,5,1,0"
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
 
   # --- CELERY WORKER ---
   - type: worker
@@ -123,6 +125,12 @@ services:
         sync: false
       - key: DEFAULT_FROM_EMAIL
         value: FinFlow <projetodefinancas34@gmail.com>
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
 
   # --- CELERY BEAT ---
   - type: worker

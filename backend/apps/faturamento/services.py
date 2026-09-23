@@ -105,7 +105,7 @@ def processar_cobrancas_recorrentes(owner=None) -> list[Fatura]:
     (task agendada do Celery). A fatura gerada herda o dono da cobrança.
     """
     hoje = timezone.localdate()
-    cobrancas = CobrancaRecorrente.objects.select_for_update().filter(
+    cobrancas = CobrancaRecorrente.objects.select_for_update(of=('self',)).select_related("cliente", "categoria", "owner").filter(
         ativa=True,
         proxima_cobranca__lte=hoje
     )
