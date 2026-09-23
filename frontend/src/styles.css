@@ -263,6 +263,130 @@ body {
   background-color: var(--bg-card-hover);
 }
 
+/* Ações da linha (clientes/faturas): classe utilitária no lugar do estilo
+   inline — inline não pode ser sobrescrito por media queries. Alinha à
+   direita no desktop e permite quebra de linha no modo card (< 768px). */
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.table-actions > * {
+  white-space: nowrap;
+}
+
+/* Faixa intermediária (768–1100px): mantém as colunas, mas dá largura
+   mínima à tabela para .table-scroll rolar em vez de espremer células. */
+@media (min-width: 768px) and (max-width: 1100px) {
+  .table-scroll .data-table {
+    min-width: 760px;
+  }
+}
+
+/* --------------------------------------------------------------
+   Mobile/tablet (< 768px): navbar empilha, cabeçalho vira coluna
+   e cada linha da tabela vira um "card" (label ::before + valor),
+   eliminando o scroll horizontal nas telas mais estreitas.
+   -------------------------------------------------------------- */
+@media (max-width: 767.98px) {
+  .navbar {
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .nav-links {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.25rem;
+  }
+
+  .nav-link {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.875rem;
+  }
+
+  .content-container {
+    padding: 1.25rem 0.75rem;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .page-title {
+    font-size: 1.4rem;
+  }
+
+  /* Modo card da tabela: cada <tr> vira um bloco com label + valor */
+  .data-table,
+  .data-table tbody,
+  .data-table tr,
+  .data-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .data-table thead {
+    display: none;
+  }
+
+  .data-table tr {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .data-table tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .data-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.3rem 0;
+    border-bottom: none;
+    text-align: right;
+    font-size: 0.875rem;
+  }
+
+  .data-table td::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: left;
+    flex-shrink: 0;
+  }
+
+  /* Linhas de estado (carregando/vazio, com colSpan) sem label. */
+  .data-table td[colspan] {
+    display: block;
+    text-align: center;
+    padding: 0.5rem 0;
+  }
+
+  .data-table td[colspan]::before {
+    content: none;
+  }
+
+  /* Ações encostadas à esquerda dentro do card. */
+  .data-table .table-actions {
+    justify-content: flex-start;
+  }
+}
+
 /* Status Badges */
 .badge {
   display: inline-flex;

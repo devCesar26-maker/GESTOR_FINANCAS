@@ -289,6 +289,9 @@ export default function Clientes() {
       </div>
 
       <div className="card-table">
+        {/* table-scroll: em telas estreitas a tabela rola na horizontal;
+            abaixo de 768px o CSS transforma as linhas em cards. */}
+        <div className="table-scroll">
         <table className="data-table">
           <thead>
             <tr>
@@ -315,20 +318,20 @@ export default function Clientes() {
             ) : (
               clientes.map((c) => (
                 <tr key={c.id}>
-                  <td style={{ fontWeight: 600 }}>{c.nome}</td>
-                  <td>
+                  <td data-label="Nome" style={{ fontWeight: 600 }}>{c.nome}</td>
+                  <td data-label="Papel">
                     <BadgePapel papel={c.papel} />
                   </td>
-                  <td>{c.tipo_pessoa === 'pf' ? 'Pessoa Física' : 'Pessoa Jurídica'}</td>
-                  <td>{c.documento || '—'}</td>
-                  <td>{c.email || c.telefone || '—'}</td>
-                  <td>
+                  <td data-label="Tipo">{c.tipo_pessoa === 'pf' ? 'Pessoa Física' : 'Pessoa Jurídica'}</td>
+                  <td data-label="Documento">{c.documento || '—'}</td>
+                  <td data-label="Contato">{c.email || c.telefone || '—'}</td>
+                  <td data-label="Lembretes">
                     {c.notificacoes_ativas !== false
                       ? <span className="badge badge-paga">lembretes ✓</span>
                       : <span className="badge badge-pendente">sem lembretes</span>}
                   </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'flex', columnGap: '6px', justifyContent: 'flex-end' }}>
+                  <td data-label="Ações" style={{ textAlign: 'right' }}>
+                    <div className="table-actions">
                       <BotaoWhatsApp cliente={c} />
                       <button
                         className="btn btn-primary btn-sm"
@@ -351,6 +354,7 @@ export default function Clientes() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {clienteParaExcluir && (

@@ -450,7 +450,8 @@ export default function Faturas() {
 
       <div className="card-table">
         {/* table-scroll: em telas estreitas a tabela rola na horizontal em vez
-            de cortar o último botão de ação na borda do card. */}
+            de cortar o último botão de ação na borda do card. Abaixo de 768px
+            o CSS transforma as linhas em cards (ver styles.css). */}
         <div className="table-scroll">
         <table className="data-table">
           <thead>
@@ -478,37 +479,28 @@ export default function Faturas() {
             ) : (
               faturas.map((f) => (
                 <tr key={f.id}>
-                  <td style={{ fontWeight: 600 }}>{f.numero}</td>
-                  <td>{f.cliente_nome || f.cliente}</td>
-                  <td>{f.categoria_nome || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
-                  <td>{f.descricao || '—'}</td>
-                  <td style={{ minWidth: '90px' }}>
+                  <td data-label="Número" style={{ fontWeight: 600 }}>{f.numero}</td>
+                  <td data-label="Cliente/Fornecedor">{f.cliente_nome || f.cliente}</td>
+                  <td data-label="Categoria">{f.categoria_nome || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
+                  <td data-label="Descrição">{f.descricao || '—'}</td>
+                  <td data-label="Tipo" style={{ minWidth: '90px' }}>
                     <span style={{ color: f.tipo === 'a_receber' ? 'var(--accent-success)' : 'var(--accent-danger)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                       {f.tipo === 'a_receber' ? 'Receber' : 'Pagar'}
                     </span>
                   </td>
-                  <td>{f.vencimento}</td>
-                  <td style={{ fontWeight: 700 }}>{formatCurrency(f.valor)}</td>
-                  <td>
+                  <td data-label="Vencimento">{f.vencimento}</td>
+                  <td data-label="Valor" style={{ fontWeight: 700 }}>{formatCurrency(f.valor)}</td>
+                  <td data-label="Status">
                     <span className={`badge badge-${f.status}`}>
                       {f.status}
                     </span>
                   </td>
-                  {/* Linha ÚNICA e compacta: flex row + nowrap com botões xs
-                      mantém 💬, Receber, Editar e Cancelar na mesma linha,
-                      sem esticar a altura do registro nem empilhar. Em telas
-                      estreitas o container .table-scroll rola na horizontal. */}
-                  <td style={{ textAlign: 'right' }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'row',
-                        gap: '0.5rem',
-                        alignItems: 'center',
-                        justifyContent: 'flex-end',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
+                  {/* Ações compactas: .table-actions (flex wrap) substitui o
+                      antigo estilo inline (inline não pode ser sobrescrito por
+                      media queries). No desktop alinha à direita como antes;
+                      no modo card (< 768px) quebra linha sem estourar. */}
+                  <td data-label="Ações" style={{ textAlign: 'right' }}>
+                    <div className="table-actions">
                       {/* Faturas PAGAS: somente leitura + ver comprovante 📎 */}
                       {f.status === 'paga' && f.comprovante_url && (
                         <button
