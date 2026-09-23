@@ -481,8 +481,8 @@ export default function Faturas() {
                 <tr key={f.id}>
                   <td data-label="Número" style={{ fontWeight: 600 }}>{f.numero}</td>
                   <td data-label="Cliente/Fornecedor">{f.cliente_nome || f.cliente}</td>
-                  <td data-label="Categoria">{f.categoria_nome || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
-                  <td data-label="Descrição">{f.descricao || '—'}</td>
+                  <td data-label="Categoria" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{f.categoria_nome || ''}</td>
+                  <td data-label="Descrição" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{f.descricao || ''}</td>
                   <td data-label="Tipo" style={{ minWidth: '90px' }}>
                     <span style={{ color: f.tipo === 'a_receber' ? 'var(--accent-success)' : 'var(--accent-danger)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                       {f.tipo === 'a_receber' ? 'Receber' : 'Pagar'}
@@ -523,7 +523,7 @@ export default function Faturas() {
                             {f.tipo === 'a_pagar' ? 'Pagar' : 'Receber'}
                           </button>
                           <button
-                            className="btn btn-primary btn-xs"
+                            className="btn btn-secondary btn-xs"
                             onClick={() => abrirModalEdicao(f)}
                             title="Editar fatura"
                           >

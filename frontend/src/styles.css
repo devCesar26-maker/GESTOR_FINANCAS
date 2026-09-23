@@ -8,12 +8,19 @@
   --border-color: #24393e;
   --text-main: #ecf1ef;
   --text-muted: #8fa3a3;
-  --accent-primary: #1f6f6b;
-  --accent-primary-hover: #28857f;
+  --accent-primary: #0d9488;
+  --accent-primary-hover: #0f766e;
   --accent-success: #10b981;
   --accent-warning: #f59e0b;
   --accent-danger: #ef4444;
   --accent-info: #2b7a78;
+  /* Papéis semânticos de ação */
+  --action-secondary-border: #475569;
+  --action-secondary-text: #94a3b8;
+  /* Badge de categorização neutra (papel do cliente) */
+  --badge-neutral-bg: rgba(100, 116, 139, 0.12);
+  --badge-neutral-border: rgba(100, 116, 139, 0.3);
+  --badge-neutral-text: #94a3b8;
   --font-serif: 'Newsreader', Georgia, 'Times New Roman', serif;
   --font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
   --radius-sm: 3px;
@@ -387,27 +394,44 @@ body {
   }
 }
 
-/* Status Badges */
+/* Status Badges — financeiro (verde/amarelo/vermelho: NÃO alterar) */
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.3rem 0.65rem;
+  padding: 0.25rem 0.55rem;
   border-radius: 3px;
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: 0.72rem;
+  font-weight: 600;
   text-transform: capitalize;
+  letter-spacing: 0.01em;
 }
 
-.badge-pendente { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
-.badge-paga { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-.badge-vencida { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
-.badge-cancelada { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); }
+.badge-pendente { background: rgba(245, 158, 11, 0.12); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.25); }
+.badge-paga { background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.25); }
+.badge-vencida { background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25); }
+.badge-cancelada { background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2); }
 
-/* Papel "ambos" (cliente E fornecedor): badge neutro com os dois pontos de cor */
-.badge-ambos { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); gap: 0.35rem; }
-.papel-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-.papel-dot-verde { background: #34d399; }
-.papel-dot-laranja { background: #fbbf24; }
+/* Badge de categorização neutra (papel do cliente: não é dado financeiro) */
+.badge-papel {
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+  border: 1px solid var(--badge-neutral-border);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Indicador discreto de lembretes (não é ação, não deve parecer botão) */
+.indicator-bell {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.88rem;
+  color: var(--badge-neutral-text);
+  opacity: 0.6;
+  cursor: default;
+  position: relative;
+}
+.indicator-bell[title]:hover { opacity: 1; }
 
 /* Buttons */
 .btn {
@@ -441,13 +465,25 @@ body {
 }
 .btn-danger:hover { filter: brightness(1.1); }
 
+/* Ação secundária: outline cinza-ardósia, sem preenchimento sólido.
+   Para ações de baixa prioridade (Editar, Ver, etc). */
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--action-secondary-border);
+  color: var(--action-secondary-text);
+}
+.btn-secondary:hover {
+  background-color: rgba(71, 85, 105, 0.2);
+  color: var(--text-main);
+  border-color: var(--text-muted);
+}
+
 .btn-sm {
   padding: 0.4rem 0.8rem;
   font-size: 0.8rem;
 }
 
-/* Botão extra-compacto para células de ação em tabelas: cabe 4+ botões em
-   uma única linha sem esticar a altura do registro. */
+/* Botão extra-compacto para células de ação em tabelas */
 .btn-xs {
   padding: 0.25rem 0.5rem;
   font-size: 0.72rem;

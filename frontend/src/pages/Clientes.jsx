@@ -47,20 +47,8 @@ function BotaoWhatsApp({ cliente }) {
 // - ambos: entidade que é cliente E fornecedor do mesmo gestor — badge
 //   neutro com os dois pontos de cor e rótulo explícito "Cliente/Fornecedor".
 export function BadgePapel({ papel }) {
-  if (papel === 'ambos') {
-    return (
-      <span className="badge badge-ambos" title="Atua como cliente e fornecedor">
-        <span className="papel-dot papel-dot-verde" aria-hidden="true"></span>
-        <span className="papel-dot papel-dot-laranja" aria-hidden="true"></span>
-        Cliente/Fornecedor
-      </span>
-    )
-  }
-  return (
-    <span className={`badge ${papel === 'fornecedor' ? 'badge-pendente' : 'badge-paga'}`}>
-      {papel === 'fornecedor' ? 'Fornecedor' : 'Cliente'}
-    </span>
-  )
+  const label = papel === 'ambos' ? 'Cliente / Fornecedor' : papel === 'fornecedor' ? 'Fornecedor' : 'Cliente'
+  return <span className="badge badge-papel">{label}</span>
 }
 
 const FORMULARIO_VAZIO = {
@@ -323,18 +311,18 @@ export default function Clientes() {
                     <BadgePapel papel={c.papel} />
                   </td>
                   <td data-label="Tipo">{c.tipo_pessoa === 'pf' ? 'Pessoa Física' : 'Pessoa Jurídica'}</td>
-                  <td data-label="Documento">{c.documento || '—'}</td>
-                  <td data-label="Contato">{c.email || c.telefone || '—'}</td>
+                  <td data-label="Documento" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{c.documento || ''}</td>
+                  <td data-label="Contato" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{c.email || c.telefone || ''}</td>
                   <td data-label="Lembretes">
                     {c.notificacoes_ativas !== false
-                      ? <span className="badge badge-paga">lembretes ✓</span>
-                      : <span className="badge badge-pendente">sem lembretes</span>}
+                      ? <span className="indicator-bell" title="Lembretes automáticos ativos">🔔</span>
+                      : <span className="indicator-bell" title="Sem lembretes" style={{ opacity: 0.2 }}>🔕</span>}
                   </td>
                   <td data-label="Ações" style={{ textAlign: 'right' }}>
                     <div className="table-actions">
                       <BotaoWhatsApp cliente={c} />
                       <button
-                        className="btn btn-primary btn-sm"
+                        className="btn btn-secondary btn-sm"
                         onClick={() => abrirModalEdicao(c)}
                         title="Editar cadastro"
                       >
