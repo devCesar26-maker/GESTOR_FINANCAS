@@ -47,8 +47,19 @@ function BotaoWhatsApp({ cliente }) {
 // - ambos: entidade que é cliente E fornecedor do mesmo gestor — badge
 //   neutro com os dois pontos de cor e rótulo explícito "Cliente/Fornecedor".
 export function BadgePapel({ papel }) {
-  const label = papel === 'ambos' ? 'Cliente / Fornecedor' : papel === 'fornecedor' ? 'Fornecedor' : 'Cliente'
-  return <span className="badge badge-papel">{label}</span>
+  if (papel === 'ambos') {
+    return (
+      <span className="badge badge-papel badge-ambos">
+        <span className="papel-dot papel-dot-verde"></span>
+        <span className="papel-dot papel-dot-laranja"></span>
+        Cliente/Fornecedor
+      </span>
+    )
+  }
+  if (papel === 'fornecedor') {
+    return <span className="badge badge-papel badge-pendente">Fornecedor</span>
+  }
+  return <span className="badge badge-papel badge-paga">Cliente</span>
 }
 
 const FORMULARIO_VAZIO = {
@@ -76,6 +87,9 @@ export default function Clientes() {
 
   // Edição: cliente em edição no modal (null = modo criação).
   const [clienteEditando, setClienteEditando] = useState(null)
+
+  // Modal de detalhes completos do cliente (oculta ações poluidas da tabela).
+  const [clienteDetalhes, setClienteDetalhes] = useState(null)
 
   // Erros de validação inline, por campo (exibidos sob cada input).
   const [fieldErrors, setFieldErrors] = useState({})
@@ -323,17 +337,10 @@ export default function Clientes() {
                       <BotaoWhatsApp cliente={c} />
                       <button
                         className="btn btn-secondary btn-sm"
-                        onClick={() => abrirModalEdicao(c)}
-                        title="Editar cadastro"
+                        onClick={() => setClienteDetalhes(c)}
+                        title="Ver detalhes do cadastro"
                       >
-                        Editar
-                      </button>
-                      <button
-                        className="btn btn-danger btn-sm"
-                        onClick={() => setClienteParaExcluir(c)}
-                        title="Excluir cadastro"
-                      >
-                        Excluir
+                        👁️ Detalhes
                       </button>
                     </div>
                   </td>
@@ -344,6 +351,75 @@ export default function Clientes() {
         </table>
         </div>
       </div>
+
+      {clienteDetalhes && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Detalhes do cliente">
+          <div className="modal-card" style={{ maxWidth: 480 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Detalhes do Cadastro</h3>
+              <button className="btn-logout" onClick={() => setClienteDetalhes(null)} aria-label="Fechar">✕</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', marginBottom: '1.25rem', fontSize: '0.9rem' }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block' }}>Nome</span>
+                <strong style={{ fontSize: '1.1rem' }}>{clienteDetalhes.nome}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block' }}>Papel</span>
+                <BadgePapel papel={clienteDetalhes.papel} />
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block' }}>Tipo Pessoa</span>
+                <span>{clienteDetalhes.tipo_pessoa === 'pf' ? 'Pessoa Física' : 'Pessoa Jurídica'}</span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block' }}>CPF / CNPJ</span>
+                <span>{clienteDetalhes.documento || 'Não informado'}</span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block' }}>Lembretes Automáticos</span>
+                <span>{clienteDetalhes.notificacoes_ativas !== false ? '🔔 Ativos' : '🔕 Desativados'}</span>
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block' }}>E-mail</span>
+                <span>{clienteDetalhes.email || 'Não informado'}</span>
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block' }}>Telefone / WhatsApp</span>
+                <span>{clienteDetalhes.telefone || 'Não informado'}</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', flexWrap: 'wrap', marginTop: '1.25rem' }}>
+              <BotaoWhatsApp cliente={clienteDetalhes} />
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  const target = clienteDetalhes;
+                  setClienteDetalhes(null);
+                  abrirModalEdicao(target);
+                }}
+              >
+                ✏️ Editar Cadastro
+              </button>
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={() => {
+                  const target = clienteDetalhes;
+                  setClienteDetalhes(null);
+                  setClienteParaExcluir(target);
+                }}
+              >
+                🗑️ Excluir
+              </button>
+              <button className="btn btn-logout btn-sm" onClick={() => setClienteDetalhes(null)}>
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {clienteParaExcluir && (
         <ConfirmDialog

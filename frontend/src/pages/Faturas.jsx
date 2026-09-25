@@ -86,6 +86,9 @@ export default function Faturas() {
   // Edição: fatura em edição no modal (null = modo criação).
   const [faturaEditando, setFaturaEditando] = useState(null)
 
+  // Modal de detalhes completos da fatura (oculta ações poluidas da tabela).
+  const [faturaDetalhes, setFaturaDetalhes] = useState(null)
+
   // Modal de confirmação de cancelamento (substitui window.confirm nativo).
   const [faturaParaCancelar, setFaturaParaCancelar] = useState(null)
   const [cancelando, setCancelando] = useState(false)
@@ -501,7 +504,17 @@ export default function Faturas() {
                       no modo card (< 768px) quebra linha sem estourar. */}
                   <td data-label="Ações" style={{ textAlign: 'right' }}>
                     <div className="table-actions">
-                      {/* Faturas PAGAS: somente leitura + ver comprovante 📎 */}
+                      {f.tipo === 'a_receber' && (f.status === 'pendente' || f.status === 'vencida') && (
+                        <BotaoCobrancaWhatsApp fatura={f} />
+                      )}
+                      {(f.status === 'pendente' || f.status === 'vencida') && (
+                        <button
+                          className="btn btn-success btn-xs"
+                          onClick={() => abrirModalPagar(f)}
+                        >
+                          {f.tipo === 'a_pagar' ? 'Pagar' : 'Receber'}
+                        </button>
+                      )}
                       {f.status === 'paga' && f.comprovante_url && (
                         <button
                           className="btn btn-outline btn-xs"
@@ -513,41 +526,13 @@ export default function Faturas() {
                           📎 Comprovante
                         </button>
                       )}
-                      {ehEditavel(f) && (
-                        <>
-                          {f.tipo === 'a_receber' && <BotaoCobrancaWhatsApp fatura={f} />}
-                          <button
-                            className="btn btn-success btn-xs"
-                            onClick={() => abrirModalPagar(f)}
-                          >
-                            {f.tipo === 'a_pagar' ? 'Pagar' : 'Receber'}
-                          </button>
-                          <button
-                            className="btn btn-secondary btn-xs"
-                            onClick={() => abrirModalEdicao(f)}
-                            title="Editar fatura"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            className="btn btn-danger btn-xs"
-                            onClick={() => setFaturaParaCancelar(f)}
-                          >
-                            Cancelar
-                          </button>
-                        </>
-                      )}
-                      {f.status === 'vencida' && (
-                        <>
-                          {f.tipo === 'a_receber' && <BotaoCobrancaWhatsApp fatura={f} />}
-                          <button
-                            className="btn btn-success btn-xs"
-                            onClick={() => abrirModalPagar(f)}
-                          >
-                            {f.tipo === 'a_pagar' ? 'Pagar' : 'Receber'}
-                          </button>
-                        </>
-                      )}
+                      <button
+                        className="btn btn-secondary btn-xs"
+                        onClick={() => setFaturaDetalhes(f)}
+                        title="Ver detalhes da fatura"
+                      >
+                        👁️ Detalhes
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -557,6 +542,92 @@ export default function Faturas() {
         </table>
         </div>
       </div>
+
+      {faturaDetalhes && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Detalhes da fatura">
+          <div className="modal-card" style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Detalhes da Fatura {faturaDetalhes.numero}</h3>
+              <button className="btn-logout" onClick={() => setFaturaDetalhes(null)} aria-label="Fechar">✕</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', marginBottom: '1.25rem', fontSize: '0.9rem' }}>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block' }}>Cliente / Fornecedor</span>
+                <strong>{faturaDetalhes.cliente_nome || faturaDetalhes.cliente}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block' }}>Categoria</span>
+                <span>{faturaDetalhes.categoria_nome || 'Sem categoria'}</span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block' }}>Tipo</span>
+                <span style={{ color: faturaDetalhes.tipo === 'a_receber' ? 'var(--accent-success)' : 'var(--accent-danger)', fontWeight: 600 }}>
+                  {faturaDetalhes.tipo === 'a_receber' ? 'A Receber' : 'A Pagar'}
+                </span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block' }}>Valor</span>
+                <strong style={{ fontSize: '1.05rem' }}>{formatCurrency(faturaDetalhes.valor)}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block' }}>Vencimento</span>
+                <span>{faturaDetalhes.vencimento}</span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block' }}>Status</span>
+                <span className={`badge badge-${faturaDetalhes.status}`}>{faturaDetalhes.status}</span>
+              </div>
+            </div>
+
+            {faturaDetalhes.descricao && (
+              <div style={{ background: 'var(--bg-input)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem', fontSize: '0.875rem' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block', marginBottom: '0.2rem' }}>Descrição</span>
+                {faturaDetalhes.descricao}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+              {faturaDetalhes.status === 'paga' && faturaDetalhes.comprovante_url && (
+                <button
+                  className="btn btn-outline btn-sm"
+                  onClick={() => { abrirComprovante(faturaDetalhes); }}
+                  disabled={baixandoComprovante}
+                >
+                  📎 Ver Comprovante
+                </button>
+              )}
+              {ehEditavel(faturaDetalhes) && (
+                <>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      const target = faturaDetalhes;
+                      setFaturaDetalhes(null);
+                      abrirModalEdicao(target);
+                    }}
+                  >
+                    ✏️ Editar Fatura
+                  </button>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={() => {
+                      const target = faturaDetalhes;
+                      setFaturaDetalhes(null);
+                      setFaturaParaCancelar(target);
+                    }}
+                  >
+                    🚫 Cancelar Fatura
+                  </button>
+                </>
+              )}
+              <button className="btn btn-logout btn-sm" onClick={() => setFaturaDetalhes(null)}>
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {faturaParaCancelar && (
         <ConfirmDialog
