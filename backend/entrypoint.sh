@@ -15,4 +15,11 @@ if [ "$DEBUG" = "true" ] || [ "$DEBUG" = "True" ]; then
     fi
 fi
 
+# Se ativado (ex: Render Free tier de container único), inicia Celery Worker e Beat em background
+if [ "$RUN_EMBEDDED_CELERY" = "true" ] || [ "$RUN_EMBEDDED_CELERY" = "True" ]; then
+    echo "Iniciando Celery Worker e Beat em segundo plano no mesmo container..."
+    celery -A finflow worker -l info --concurrency=2 &
+    celery -A finflow beat -l info &
+fi
+
 exec "$@"

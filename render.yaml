@@ -1,16 +1,18 @@
 services:
-  # --- BACKEND (Django API) ---
+  # --- BACKEND (Django API + Celery Worker e Beat embutidos - Plano 100% FREE) ---
   - type: web
     name: finflow-backend
     env: docker
     dockerfilePath: ./backend/Dockerfile.prod
     dockerContext: ./backend
     region: oregon
-    plan: starter
+    plan: free
     healthCheckPath: /admin/login/
     envVars:
       - key: DEBUG
         value: "false"
+      - key: RUN_EMBEDDED_CELERY
+        value: "true"
       - key: SECRET_KEY
         generateValue: true
       - key: ALLOWED_HOSTS
@@ -69,123 +71,7 @@ services:
       - key: CLOUDINARY_API_SECRET
         sync: false
 
-  # --- CELERY WORKER ---
-  - type: worker
-    name: finflow-worker
-    env: docker
-    dockerfilePath: ./backend/Dockerfile.prod
-    dockerContext: ./backend
-    dockerCommand: celery -A finflow worker -l info
-    envVars:
-      - key: DEBUG
-        value: "false"
-      - key: SECRET_KEY
-        fromService:
-          type: web
-          name: finflow-backend
-          envVarKey: SECRET_KEY
-      - key: DB_ENGINE
-        value: django.db.backends.postgresql
-      - key: DB_HOST
-        fromDatabase:
-          name: finflow-db
-          property: host
-      - key: DB_NAME
-        fromDatabase:
-          name: finflow-db
-          property: database
-      - key: DB_USER
-        fromDatabase:
-          name: finflow-db
-          property: user
-      - key: DB_PASSWORD
-        fromDatabase:
-          name: finflow-db
-          property: password
-      - key: DB_PORT
-        fromDatabase:
-          name: finflow-db
-          property: port
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: finflow-redis
-          property: connectionString
-      - key: CELERY_BROKER_URL
-        fromService:
-          type: redis
-          name: finflow-redis
-          property: connectionString
-      - key: CELERY_RESULT_BACKEND
-        fromService:
-          type: redis
-          name: finflow-redis
-          property: connectionString
-      - key: BREVO_API_KEY
-        sync: false
-      - key: DEFAULT_FROM_EMAIL
-        value: FinFlow <projetodefinancas34@gmail.com>
-      - key: CLOUDINARY_CLOUD_NAME
-        sync: false
-      - key: CLOUDINARY_API_KEY
-        sync: false
-      - key: CLOUDINARY_API_SECRET
-        sync: false
-
-  # --- CELERY BEAT ---
-  - type: worker
-    name: finflow-beat
-    env: docker
-    dockerfilePath: ./backend/Dockerfile.prod
-    dockerContext: ./backend
-    dockerCommand: celery -A finflow beat -l info
-    envVars:
-      - key: DEBUG
-        value: "false"
-      - key: SECRET_KEY
-        fromService:
-          type: web
-          name: finflow-backend
-          envVarKey: SECRET_KEY
-      - key: DB_ENGINE
-        value: django.db.backends.postgresql
-      - key: DB_HOST
-        fromDatabase:
-          name: finflow-db
-          property: host
-      - key: DB_NAME
-        fromDatabase:
-          name: finflow-db
-          property: database
-      - key: DB_USER
-        fromDatabase:
-          name: finflow-db
-          property: user
-      - key: DB_PASSWORD
-        fromDatabase:
-          name: finflow-db
-          property: password
-      - key: DB_PORT
-        fromDatabase:
-          name: finflow-db
-          property: port
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: finflow-redis
-          property: connectionString
-      - key: CELERY_BROKER_URL
-        fromService:
-          type: redis
-          name: finflow-redis
-          property: connectionString
-      - key: CELERY_RESULT_BACKEND
-        fromService:
-          type: redis
-          name: finflow-redis
-          property: connectionString
-
-  # --- FRONTEND (React Static Site) ---
+  # --- FRONTEND (React Static Site - 100% Grátis no Render) ---
   - type: web
     name: finflow-frontend
     env: static
@@ -199,14 +85,15 @@ services:
         source: /*
         destination: /index.html
 
-  # --- REDIS MEMORY INSTANCE ---
+  # --- REDIS (Plano Gratuito) ---
   - type: redis
     name: finflow-redis
+    plan: free
     ipAllowList: []
 
 databases:
-  # --- POSTGRESQL GERENCIADO ---
+  # --- POSTGRESQL GERENCIADO (Plano Gratuito por 90 dias no Render) ---
   - name: finflow-db
     databaseName: financeiro
     user: finflow_user
-    plan: starter
+    plan: free

@@ -3,6 +3,7 @@ import csv
 from datetime import datetime
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.files.uploadedfile import UploadedFile
 from django.db.models import Q
 from django.http import HttpResponse
@@ -214,7 +215,7 @@ class FaturaViewSet(viewsets.ModelViewSet):
 
 
 class CategoriaFinanceiraViewSet(viewsets.ModelViewSet):
-    """CRUD do catálogo de categorias (centros de custo) do usuário."""
+    """CRUD do catálogo de categorias (centros de custo) do usuário com cache Redis."""
 
     serializer_class = CategoriaFinanceiraSerializer
     filter_backends = [SearchFilter, OrderingFilter]
@@ -225,14 +226,40 @@ class CategoriaFinanceiraViewSet(viewsets.ModelViewSet):
         """Multi-tenancy: cada usuário acessa apenas suas categorias."""
         return CategoriaFinanceira.objects.filter(owner=self.request.user)
 
+    def _invalidar_cache(self, user):
+        """Invalida a chave de cache do catálogo de categorias do usuário."""
+        cache.delete(f"categorias_owner_{user.id}")
+
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
+        self._invalidar_cache(self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save()
+        self._invalidar_cache(self.request.user)
+
+    def perform_destroy(self, instance):
+        owner = instance.owner
+        instance.delete()
+        self._invalidar_cache(owner)
 
     def list(self, request, *args, **kwargs):
-        """Na primeira listagem, semeia o catálogo padrão (idempotente)."""
+        """Cache Redis por usuário (TTL 1h) com semeadura idempotente no 1º acesso."""
+        # Se houver busca por query params, desvia do cache para trazer filtrado
+        if request.query_params.get("search"):
+            return super().list(request, *args, **kwargs)
+
+        cache_key = f"categorias_owner_{request.user.id}"
+        dados_cache = cache.get(cache_key)
+        if dados_cache is not None:
+            return Response(dados_cache)
+
         if not CategoriaFinanceira.objects.filter(owner=request.user).exists():
             CategoriaFinanceira.criar_categorias_padrao(request.user)
-        return super().list(request, *args, **kwargs)
+
+        resposta = super().list(request, *args, **kwargs)
+        cache.set(cache_key, resposta.data, timeout=3600)
+        return resposta
 
 
 class CobrancaRecorrenteViewSet(viewsets.ModelViewSet):
