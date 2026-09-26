@@ -26,4 +26,4 @@ USER appuser
 EXPOSE 8000
 
 # 3. Otimizado para o plano Free (2 workers + 2 threads consome metade da memória RAM)
-CMD ["./entrypoint.sh", "gunicorn", "finflow.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--threads", "2", "--timeout", "120"]
+CMD exec gunicorn finflow.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --threads 2 --timeout 120
