@@ -7,7 +7,7 @@ services:
     dockerContext: ./backend
     region: oregon
     plan: free
-    healthCheckPath: /admin/login/
+    #healthCheckPath: /admin/login/
     envVars:
       - key: PORT
         value: "8000"
