@@ -1,0 +1,35 @@
+# Garante que segredos e artefatos locais NÃO sejam embutidos na imagem
+# de produção (COPY . . no Dockerfile.prod).
+.env
+.env.*
+!.env.example
+
+# Git / CI
+.git
+.gitignore
+.github
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Django / Celery
+db.sqlite3
+celerybeat-schedule
+celerybeat.pid
+staticfiles/
+media/
+
+# testes e docs não usados em produção
+tests/
+conftest.py
+pytest.ini
+*.md
+
+# Docker (não precisa ficar dentro da própria imagem)
+Dockerfile
+Dockerfile.prod
+.dockerignore

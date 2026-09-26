@@ -3,8 +3,9 @@
 # Diferenças do Dockerfile de dev:
 # - Usa imagem base slim sem ferramentas de build (deps já binárias no pip).
 # - Roda como usuário não-root (segurança).
-# - O código NÃO é embutido na imagem: em produção o deploy injeta o código
-#   (volume/CI), mantendo esta imagem única para backend/worker/beat.
+# - O código da aplicação é embutido na imagem (COPY . .), cobrindo também
+#   deploys diretos no Render. Segredos/artefatos locais ficam fora via
+#   backend/.dockerignore.
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -16,7 +17,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY entrypoint.sh .
+COPY . .
 RUN chmod +x entrypoint.sh
 
 # Usuário não-root; /app é montado pelo deploy (código) e precisa ser
