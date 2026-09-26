@@ -9,6 +9,8 @@ services:
     plan: free
     healthCheckPath: /admin/login/
     envVars:
+      - key: PORT
+        value: "8000"
       - key: DEBUG
         value: "false"
       - key: RUN_EMBEDDED_CELERY
