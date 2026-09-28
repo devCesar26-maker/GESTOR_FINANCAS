@@ -111,7 +111,7 @@ services:
   # (o tipo "static" puro não é aceito pelo validador; "env: static" é o
   # alias legado).
   - type: web
-    name: finflow-frontend
+    name: gestor-financeiro
     runtime: static
     buildCommand: cd frontend && npm install && npm run build
     # Vite → dist (Create React App seria frontend/build)
