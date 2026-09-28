@@ -1,30 +1,43 @@
+# Dockerfile de PRODUÇÃO do FinFlow — otimizado para o Render Free (512 MB).
+#
+# Fluxo do container:
+#   ENTRYPOINT (entrypoint.sh): wait_for_db → migrate → Celery worker/beat
+#   CMD: Gunicorn (PID 1) com 1 worker × 2 threads, sem --preload.
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DJANGO_SETTINGS_MODULE=finflow.settings \
+    # Timeouts do pip (evita build falhando por lentidão de rede)
     PIP_DEFAULT_TIMEOUT=100 \
     PIP_RETRIES=10
 
 WORKDIR /app
 
+# Dependências primeiro: maximiza o cache de camadas (só reinstala quando
+# requirements.txt muda). Flags explícitas + env de fallback acima.
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --timeout 100 --retries 10 -r requirements.txt
 
+# Código da aplicação.
 COPY . .
 RUN chmod +x entrypoint.sh
 
+# collectstatic no BUILD (não no arranque): o boot do Render fica leve e o
+# health check sobe mais rápido. SECRET_KEY dummy só para a importação das
+# settings passar (nada aqui toca no banco nem no Redis).
 RUN SECRET_KEY=build_dummy_key python manage.py collectstatic --noinput --clear
 
+# Usuário não-root + permissões de escrita apenas onde precisa.
 RUN useradd --create-home appuser \
     && mkdir -p /app/media /app/staticfiles \
     && chown -R appuser:appuser /app
-
 USER appuser
 
 EXPOSE 8000
 
 ENTRYPOINT ["./entrypoint.sh"]
 
-# Ajustado para 1 worker e 2 threads sem --preload (economiza ~180MB de RAM)
-CMD ["sh", "-c", "exec gunicorn finflow.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 2 --timeout 120 --max-requests 300 --max-requests-jitter 50"]
+# Boot leve para 512 MB: 1 worker × 2 threads, sem --preload (o Celery solo
+# já roda no mesmo container). PORT é injetada pelo Render.
+CMD ["sh", "-c", "exec gunicorn finflow.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 2 --timeout 120"]

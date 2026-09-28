@@ -41,7 +41,10 @@ def _set_refresh_cookie(response, refresh_token):
         path=REFRESH_COOKIE_PATH,
         httponly=True,
         secure=True,
-        samesite="Lax",
+        # Deploy Render: SPA e API em subdomínios diferentes = contexto
+        # cross-site — o cookie só é guardado/enviado no XHR com SameSite=None.
+        # Em dev (mesma origem via proxy Vite) o padrão é Lax (ver settings).
+        samesite=settings.REFRESH_COOKIE_SAMESITE,
     )
 
 

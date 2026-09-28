@@ -1,9 +1,28 @@
 import axios from 'axios'
 
-// Todas as chamadas passam pelo proxy do Vite (mesma origem em dev),
-// então a base é apenas '/api'.
+// ---------------------------------------------------------------------------
+// Origem da API (deploy Render: SPA e API em subdomínios DIFERENTES)
+// ---------------------------------------------------------------------------
+// Em dev (e no docker-compose) as chamadas passam pelo proxy do Vite (mesma
+// origem): VITE_API_URL não existe e API_ORIGIN fica vazio — baseURL é
+// apenas '/api', como sempre. No Render, VITE_API_URL é definida no BUILD
+// (variável VITE_* do Vite é embutida no bundle; ver render.yaml).
+// Tolerante ao formato: aceita com ou sem "https://" (o fromService
+// property: host do Render devolve só o domínio) e com ou sem sufixo "/api".
+const rawApiUrl = (import.meta.env?.VITE_API_URL || '').trim()
+const comEsquema = /^[a-z][a-z0-9+.-]*:\/\//i.test(rawApiUrl)
+  ? rawApiUrl
+  : rawApiUrl
+    ? `https://${rawApiUrl}`
+    : ''
+const API_ORIGIN = comEsquema.replace(/\/+$/, '').replace(/\/api\/?$/i, '')
+
+// Origem do backend para recursos FORA de /api (ex.: download de comprovantes
+// em /media/... com JWT no header — ver Faturas.jsx). Vazio em dev.
+export const BACKEND_ORIGIN = API_ORIGIN
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: `${API_ORIGIN}/api`,
 })
 
 // ---------------------------------------------------------------------------
@@ -101,10 +120,11 @@ function garantirCsrfToken() {
   if (token) return Promise.resolve(token)
 
   if (!csrfFetchPromise) {
-    csrfFetchPromise = axios
-      .get('/api/csrf/')
-      // axios "pelado": sem interceptores (GET não passaria por eles mesmo,
-      // mas evitamos acoplamento com a instância `api`).
+    csrfFetchPromise = api
+      .get('/csrf/')
+      // Via PELA INSTÂNCIA api (baseURL certa no Render); em dev é igual a
+      // GET /api/csrf/ de antes. Seguro contra loop: o interceptor só chama
+      // garantirCsrfToken em métodos de ESCRITA, e este é um GET.
       .then(() => lerCookie('csrftoken'))
       .finally(() => {
         // Libera para nova tentativa se o cookie não tiver sido setado.

@@ -104,16 +104,57 @@ ASGI_APPLICATION = "finflow.asgi.application"
 # ---------------------------------------------------------------------------
 # Banco de dados (PostgreSQL por padrão; SQLite permitido para testes)
 # ---------------------------------------------------------------------------
-DATABASES = {
-    "default": {
-        "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.postgresql"),
-        "NAME": os.getenv("DB_NAME", "FINANCEIRO"),
-        "USER": os.getenv("DB_USER", "postgres"),
-        "PASSWORD": os.getenv("DB_PASSWORD", "CESAR26"),
-        "HOST": os.getenv("DB_HOST", "localhost"),
-        "PORT": os.getenv("DB_PORT", "5432"),
+# Provedores gerenciados (Supabase, Heroku, Render) expõem a conexão numa
+# única variável DATABASE_URL. O parser abaixo extrai credenciais e opções
+# sem dependência externa (equivale ao dj-database-url para os casos usados):
+#   postgresql://postgres.<ref>:<senha>@aws-0-<regiao>.pooler.supabase.com:6543/postgres?sslmode=require
+# Na porta 6543 (PgBouncer do Supabase em modo TRANSACTION) cursores
+# server-side do ORM são desabilitados — named cursors quebram em transações
+# com pooling. Query params (ex.: sslmode) viram OPTIONS do backend.
+def database_from_url(url: str) -> dict:
+    from urllib.parse import parse_qsl, unquote, urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme.startswith("postgres"):
+        engine = "django.db.backends.postgresql"
+    elif parsed.scheme == "sqlite":
+        engine = "django.db.backends.sqlite3"
+    else:
+        raise ValueError(f"Esquema de banco não suportado: {parsed.scheme!r}")
+
+    if engine == "django.db.backends.sqlite3":
+        return {"ENGINE": engine, "NAME": unquote(parsed.path.lstrip("/"))}
+
+    options = dict(parse_qsl(parsed.query))
+    db = {
+        "ENGINE": engine,
+        "NAME": unquote(parsed.path.lstrip("/")),
+        "USER": unquote(parsed.username or ""),
+        "PASSWORD": unquote(parsed.password or ""),
+        "HOST": parsed.hostname or "",
+        "PORT": str(parsed.port or ""),
+        "OPTIONS": options,
     }
-}
+    if (parsed.port or 0) == 6543:
+        db["DISABLE_SERVER_SIDE_CURSORS"] = True
+    return db
+
+
+if os.getenv("DATABASE_URL"):
+    # Deploy com banco gerenciado (Supabase no Render): a URL manda.
+    DATABASES = {"default": database_from_url(os.environ["DATABASE_URL"])}
+else:
+    # Desenvolvimento local / docker-compose: credenciais separadas.
+    DATABASES = {
+        "default": {
+            "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.postgresql"),
+            "NAME": os.getenv("DB_NAME", "FINANCEIRO"),
+            "USER": os.getenv("DB_USER", "postgres"),
+            "PASSWORD": os.getenv("DB_PASSWORD", "CESAR26"),
+            "HOST": os.getenv("DB_HOST", "localhost"),
+            "PORT": os.getenv("DB_PORT", "5432"),
+        }
+    }
 
 # ---------------------------------------------------------------------------
 # Autenticação / Django REST Framework
@@ -233,7 +274,12 @@ LEMRETE_DIAS_ANTES = env_int("LEMRETE_DIAS_ANTES", 3)  # DEPRECIADO (compat lega
 # própria contabilidade de rate limit, esvaziando a proteção. Redis é
 # compartido entre workers: a contagem por IP/usuario é real. Usa a mesma
 # instância Redis do stack (Celery), na DB 1 (a 0 é do broker).
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/1")
+# Sem REDIS_URL explícita, reutiliza o broker do Celery (deploy Render +
+# Upstash: uma única instância para tudo). O docker-compose de dev define
+# REDIS_URL=redis://redis:6379/1 (DB separada do broker). Lê a ENV direto
+# (e não a variável CELERY_BROKER_URL) porque esta seção do arquivo executa
+# ANTES da seção de Celery.
+REDIS_URL = os.getenv("REDIS_URL") or os.getenv("CELERY_BROKER_URL") or "redis://localhost:6379/1"
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
@@ -245,7 +291,10 @@ CACHES = {
 # Celery
 # ---------------------------------------------------------------------------
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+# Sem CELERY_RESULT_BACKEND explícito, reaproveita o broker (mesma instância
+# Redis — ex.: Upstash Free expõe uma única URL): resultados ficam em chaves
+# celery-task-meta-* na mesma DB, sem colisão com as filas do broker.
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND") or CELERY_BROKER_URL
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
@@ -331,6 +380,14 @@ SESSION_COOKIE_SECURE = env_bool("SESSION_COOKIE_SECURE", default=not DEBUG)
 CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", default=not DEBUG)
 # Cookie httpOnly do refresh token (ver apps.usuarios.views).
 REFRESH_COOKIE_SECURE = env_bool("REFRESH_COOKIE_SECURE", default=not DEBUG)
+
+# SameSite dos cookies de sessão: no deploy Render a SPA e a API ficam em
+# subdomínios DIFERENTES (contexto cross-site) — csrftoken e refresh_token
+# só são guardados/enviados no XHR com SameSite=None (exige Secure, garantido
+# acima quando DEBUG=false). O padrão "Lax" preserva dev/docker-compose
+# (mesma origem via proxy do Vite). Django aceita "Lax", "Strict" ou "None".
+CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", "Lax")
+REFRESH_COOKIE_SAMESITE = os.getenv("REFRESH_COOKIE_SAMESITE", "Lax")
 
 # Por trás de proxy que termina TLS (Render, Nginx da borda, etc.) o Django
 # recebe HTTP puro: sem este header ele NÃO sabe que o cliente veio por

@@ -1,88 +1,102 @@
+# ---------------------------------------------------------------------------
+# FinFlow — Blueprint de deploy no Render (plano FREE)
+#
+# Arquitetura (2 serviços, tudo 100% no plano gratuito):
+#   1) finflow-backend  (type: web, docker) — Django + Gunicorn, com Celery
+#      Worker (-P solo) e Beat EMBUTIDOS no mesmo container (entrypoint.sh),
+#      poupando um Background Worker pago. Banco e broker são EXTERNOS e
+#      gratuitos: Supabase (Postgres, DATABASE_URL) e Upstash (Redis,
+#      CELERY_BROKER_URL) — preenchidos à mão no painel (sync: false).
+#   2) finflow-frontend (runtime: static) — SPA React/Vite publicada na CDN
+#      do Render, com rewrite de todas as rotas para /index.html.
+#
+# Aplicar: Render Dashboard → New → Blueprint → apontar para este repo
+# (o render.yaml precisa estar na RAIZ). Depois, em finflow-backend →
+# Environment, preencha DATABASE_URL e CELERY_BROKER_URL (veja comentários).
+# ---------------------------------------------------------------------------
+
 services:
-  # --- BACKEND (Django API + Celery Worker e Beat embutidos - Plano 100% FREE) ---
+  # ===========================================================================
+  # A) BACKEND — Django API + Celery embutido (Worker + Beat) em 1 Web Service
+  # ===========================================================================
   - type: web
     name: finflow-backend
-    env: docker
-    dockerfilePath: ./backend/Dockerfile.prod
-    dockerContext: ./backend
-    region: oregon
+    # "env: docker" foi renomeado para "runtime: docker" no Blueprint Spec
+    # atual (env segue aceito como alias legado, mas o validador atual pede
+    # runtime).
+    runtime: docker
     plan: free
-    # Health check: 200 rápido, sem DB/auth (ver finflow/health.py).
-    # Sem isto o Render só verifica a porta TCP — e um app em crash-loop
-    # de migrate pode ficar "live" com banco desatualizado.
+    region: oregon
+    dockerfilePath: backend/Dockerfile.prod
+    dockerContext: backend
+    # NÃO use "/": o projeto não define rota raiz (daria 404 e o deploy
+    # ficaria "Timed Out"). /healthz/ é o health check oficial do projeto:
+    # leve (sem DB/auth), resiste a Host header arbitrário e é isento do
+    # redirect HTTPS (ver finflow/health.py e SECURE_REDIRECT_EXEMPT).
     healthCheckPath: /healthz/
+
     envVars:
+      # --- Essentials ------------------------------------------------------
       - key: PORT
         value: "8000"
       - key: DEBUG
         value: "false"
-      # Confia em X-Forwarded-Proto (Render termina TLS na borda). Sem
-      # isto, DEBUG=false ativa SECURE_SSL_REDIRECT e como o tráfego interno
-      # chega em HTTP puro, o app vira um loop infinito de 301 — principal
-      # causa do deploy nunca ficar "live".
-      - key: TRUST_PROXY
-        value: "1"
+      # Sobe o Celery (worker -P solo + beat) no MESMO container, via
+      # entrypoint.sh — plano free = 1 web service só.
       - key: RUN_EMBEDDED_CELERY
         value: "true"
+      # Render gera e rotaciona a chave automaticamente no painel.
+      # (Equivale ao "generateString: true" de specs antigas — hoje o campo
+      # do Blueprint Spec é generateValue.)
       - key: SECRET_KEY
         generateValue: true
-      # URL REAL do serviço (Render gera sufixo aleatório ao criar; se
-      # renomear o serviço, atualize aqui). Sem o host correto o Django
-      # rejeita TODA requisição com 400 DisallowedHost — foi o que matou o
-      # health check e causou o "Timed Out" do deploy.
-      - key: ALLOWED_HOSTS
-        value: finflow-backend-z6zm.onrender.com
-      # CORS por regex: o Render gera subdomínios com sufixo aleatório que
-      # mudam ao recriar/renomear o serviço; a lista fixa quebraria.
-      - key: CORS_ALLOWED_ORIGIN_REGEXES
-        value: "^https://[a-z0-9-]+\\.onrender\\.com$"
-      - key: CSRF_TRUSTED_ORIGINS
-        # Inclui a origem do PRÓPRIO backend (login do admin) e wildcard
-        # para o frontend, cujo subdomínio pode levar sufixo aleatório.
-        value: https://*.onrender.com,https://finflow-backend-z6zm.onrender.com
-      - key: DB_ENGINE
-        value: django.db.backends.postgresql
-      - key: DB_HOST
-        fromDatabase:
-          name: finflow-db
-          property: host
-      - key: DB_NAME
-        fromDatabase:
-          name: finflow-db
-          property: database
-      - key: DB_USER
-        fromDatabase:
-          name: finflow-db
-          property: user
-      - key: DB_PASSWORD
-        fromDatabase:
-          name: finflow-db
-          property: password
-      - key: DB_PORT
-        fromDatabase:
-          name: finflow-db
-          property: port
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: finflow-redis
-          property: connectionString
+
+      # --- Infra externa GRATUITA (preencher manualmente no painel) --------
+      # Supabase → Project Settings → Database → Connection string:
+      #   use a URI do POOLER (porta 6543) p/ Free, ex.:
+      #   postgresql://postgres.<ref>:<senha>@aws-0-<regiao>.pooler.supabase.com:6543/postgres
+      #   (o settings.py detecta a porta 6543 e desabilita cursores
+      #   server-side automaticamente; sslmode=require é o padrão).
+      - key: DATABASE_URL
+        sync: false
+      # Upstash → Redis → Endpoint details: copie a conexão TLS, ex.:
+      #   rediss://default:<senha>@<host>.upstash.io:6379
+      #   (O settings.py reutiliza esta URL no cache de rate-limit quando
+      #   REDIS_URL não está definida — Upstash Free só tem a DB 0.)
       - key: CELERY_BROKER_URL
-        fromService:
-          type: redis
-          name: finflow-redis
-          property: connectionString
-      - key: CELERY_RESULT_BACKEND
-        fromService:
-          type: redis
-          name: finflow-redis
-          property: connectionString
+        sync: false
+
+      # --- Hosts / CORS / CSRF (deploy cross-origin: SPA + API) ------------
+      # Aceita qualquer subdomínio *.onrender.com: o Render gera um sufixo
+      # aleatório que MUDA se o serviço for recriado — lista fixa quebraria.
+      # Troque/remova se usar domínio próprio.
+      - key: ALLOWED_HOSTS
+        value: .onrender.com
+      # Render termina o TLS na borda e repassa HTTP puro: sem isto,
+      # SECURE_SSL_REDIRECT vira um loop infinito de 301 e o deploy nunca
+      # fica "live".
+      - key: TRUST_PROXY
+        value: "1"
+      # Regex cobre o subdomínio aleatório do frontend (e do próprio backend).
+      - key: CORS_ALLOWED_ORIGIN_REGEXES
+        value: '^https://[a-z0-9-]+\.onrender\.com$'
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://*.onrender.com
+      # SPA e API em subdomínios DIFERENTES = contexto cross-site: os cookies
+      # (csrftoken e refresh_token) só viajam no XHR com SameSite=None.
+      # Em dev (mesma origem via proxy Vite) o padrão Lax é mantido.
+      - key: CSRF_COOKIE_SAMESITE
+        value: "None"
+      - key: REFRESH_COOKIE_SAMESITE
+        value: "None"
+
+      # --- E-mail / mídia (opcionais, preencher no painel se usar) ---------
       - key: BREVO_API_KEY
         sync: false
       - key: DEFAULT_FROM_EMAIL
         value: FinFlow <projetodefinancas34@gmail.com>
-      - key: LEMBRETE_DIAS_ANTES
-        value: "10,5,1,0"
+      # Recomendado no Render Free: disco é EFÊMERO a cada deploy — comprovantes
+      # (/media/) só persistem com Cloudinary configurado.
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
@@ -90,31 +104,41 @@ services:
       - key: CLOUDINARY_API_SECRET
         sync: false
 
-  # --- FRONTEND (React Static Site - 100% Grátis no Render) ---
+  # ===========================================================================
+  # B) FRONTEND — React (Vite) como Static Site (CDN global, grátis)
+  # ===========================================================================
+  # No Blueprint Spec atual, static site = type: web + runtime: static
+  # (o tipo "static" puro não é aceito pelo validador; "env: static" é o
+  # alias legado).
   - type: web
     name: finflow-frontend
-    env: static
+    runtime: static
     buildCommand: cd frontend && npm install && npm run build
-    staticPublishPath: ./frontend/dist
+    # Vite → dist (Create React App seria frontend/build)
+    staticPublishPath: frontend/dist
     envVars:
       - key: VITE_API_URL
-        # URL REAL do backend (mesma do ALLOWED_HOSTS acima).
-        value: https://finflow-backend-z6zm.onrender.com
+        # Referência dinâmica ao backend no MESMO Blueprint: o Render resolve
+        # o host real (com sufixo aleatório) na criação e mantém em sync nos
+        # redeploys. O client.js normaliza o valor (adiciona https:// se
+        # faltar — property: host devolve só o domínio, sem esquema).
+        # IMPORTANTE: VITE_* é variável de BUILD (embutida no bundle) — se o
+        # backend for recriado/renomeado, faça um "Clear cache & deploy" no
+        # frontend para regenerar o bundle com a nova URL.
+        fromService:
+          type: web
+          name: finflow-backend
+          property: host
+    # SPA: qualquer rota cai no index.html (React Router resolve client-side).
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
-
-  # --- REDIS (Plano Gratuito) ---
-  - type: redis
-    name: finflow-redis
-    plan: free
-    ipAllowList: []
-
-databases:
-  # --- POSTGRESQL GERENCIADO (plano Free: expira 30 DIAS após a criação;
-  # após mais 14 dias de graça, os dados são apagados — ver render.com/docs/free) ---
-  - name: finflow-db
-    databaseName: financeiro
-    user: finflow_user
-    plan: free
+    headers:
+      # Assets do Vite têm hash no nome: cache agressivo e seguro.
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache

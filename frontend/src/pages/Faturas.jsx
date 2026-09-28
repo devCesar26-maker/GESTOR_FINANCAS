@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import api from '../api/client'
+import api, { BACKEND_ORIGIN } from '../api/client'
 import Layout from '../components/Layout'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { montarLinkCobranca } from '../utils/whatsapp'
@@ -116,8 +116,9 @@ export default function Faturas() {
     if (!url) return
     setBaixandoComprovante(true)
     try {
-      // baseURL vazia por chamada: /media/... NÃO deve receber o prefixo /api.
-      const response = await api.get(url, { baseURL: '', responseType: 'blob' })
+      // baseURL: no Render o comprovante mora na ORIGEM da API (SPA e API
+      // em subdomínios diferentes); em dev BACKEND_ORIGIN = '' → proxy Vite.
+      const response = await api.get(url, { baseURL: BACKEND_ORIGIN, responseType: 'blob' })
       const blobUrl = window.URL.createObjectURL(response.data)
       window.open(blobUrl, '_blank', 'noopener,noreferrer')
       // Libera a memória do blob depois que o navegador abre a aba.
