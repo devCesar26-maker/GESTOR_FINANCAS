@@ -61,6 +61,9 @@ services:
       - ./backend/.env
     environment:
       DEBUG: "false"
+      # Nginx da borda termina TLS: sem isto, SECURE_SSL_REDIRECT vira loop
+      # infinito de 301 (mesmo bug corrigido no deploy do Render).
+      TRUST_PROXY: "1"
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: ${DB_NAME:-FINANCEIRO}
       DB_USER: ${DB_USER:-postgres}

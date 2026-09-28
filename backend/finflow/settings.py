@@ -325,6 +325,23 @@ CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", default=not DEBUG)
 # Cookie httpOnly do refresh token (ver apps.usuarios.views).
 REFRESH_COOKIE_SECURE = env_bool("REFRESH_COOKIE_SECURE", default=not DEBUG)
 
+# Por trás de proxy que termina TLS (Render, Nginx da borda, etc.) o Django
+# recebe HTTP puro: sem este header ele NÃO sabe que o cliente veio por
+# HTTPS e o SECURE_SSL_REDIRECT vira um loop infinito de 301 — o deploy
+# nunca passa no health check. Confie no header X-Forwarded-Proto APENAS
+# quando a variável TRUST_PROXY=1 estiver definida (nunca com o Django
+# exposto direto na internet).
+TRUST_PROXY = env_bool("TRUST_PROXY", default=False)
+if TRUST_PROXY:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    # Com X-Forwarded-Proto confiável, um request http simples não significa
+    # mais "cliente inseguro"; deixe o proxy de borda decidir o redirect.
+    SECURE_SSL_REDIRECT = False
+
+# O health check precisa responder 200 mesmo com SECURE_SSL_REDIRECT ativo
+# (Render faz a checagem por HTTP interno). Isente-o do redirect.
+SECURE_REDIRECT_EXEMPT = [r"^healthz/$"]
+
 # Doble envío CSRF: o frontend (vite :5173) envia o header X-CSRFToken nas
 # rotas de token. Em produção frontend+API são mesma origem (whitenoise);
 # em dev o proxy do vite faz o Origin diferir do Host do backend.

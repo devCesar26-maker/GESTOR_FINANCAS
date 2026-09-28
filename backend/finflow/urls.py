@@ -18,8 +18,21 @@ from apps.usuarios.views import (
     TokenRefreshCookieView,
     csrf_token_view,
 )
+from finflow.health import healthz
+
+# O checker do Render (healthCheckPath) pode enviar um Host header
+# arbitrário — o Django rejeitaria a requisição com 400 DisallowedHost
+# ANTES de rotear, e o deploy nunca ficaria "live". Definido AQUI no urlconf
+# raiz (é assim que o Django resolve error handlers — não em settings):
+# finflow.health.bad_request responde 200 apenas em /healthz/; todo o
+# resto continua retornando 400 normal.
+handler400 = "finflow.health.bad_request"
 
 urlpatterns = [
+    # Health check para orquestradores (Render healthCheckPath). Leve de
+    # propósito: sem DB, sem auth, sem DRF — deve responder 200 sempre que
+    # o processo WSGI estiver vivo, mesmo durante indisponibilidade do banco.
+    path("healthz/", healthz, name="healthz"),
     path("admin/", admin.site.urls),
     # Autenticação JWT (login com rate limit: 5/min por IP). O refresh
     # token viaja num cookie httpOnly — nunca no body da resposta.

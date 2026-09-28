@@ -7,12 +7,21 @@ services:
     dockerContext: ./backend
     region: oregon
     plan: free
-    #healthCheckPath: /admin/login/
+    # Health check: 200 rápido, sem DB/auth (ver finflow/health.py).
+    # Sem isto o Render só verifica a porta TCP — e um app em crash-loop
+    # de migrate pode ficar "live" com banco desatualizado.
+    healthCheckPath: /healthz/
     envVars:
       - key: PORT
         value: "8000"
       - key: DEBUG
         value: "false"
+      # Confia em X-Forwarded-Proto (Render termina TLS na borda). Sem
+      # isto, DEBUG=false ativa SECURE_SSL_REDIRECT e como o tráfego interno
+      # chega em HTTP puro, o app vira um loop infinito de 301 — principal
+      # causa do deploy nunca ficar "live".
+      - key: TRUST_PROXY
+        value: "1"
       - key: RUN_EMBEDDED_CELERY
         value: "true"
       - key: SECRET_KEY
@@ -22,7 +31,9 @@ services:
       - key: CORS_ALLOWED_ORIGINS
         value: https://finflow-frontend.onrender.com
       - key: CSRF_TRUSTED_ORIGINS
-        value: https://finflow-frontend.onrender.com
+        # Inclui a origem do PRÓPRIO backend: o login do Django admin é
+        # feito no domínio da API e o CSRF check exige a origem explícita.
+        value: https://finflow-frontend.onrender.com,https://finflow-backend.onrender.com
       - key: DB_ENGINE
         value: django.db.backends.postgresql
       - key: DB_HOST
@@ -94,7 +105,8 @@ services:
     ipAllowList: []
 
 databases:
-  # --- POSTGRESQL GERENCIADO (Plano Gratuito por 90 dias no Render) ---
+  # --- POSTGRESQL GERENCIADO (plano Free: expira 30 DIAS após a criação;
+  # após mais 14 dias de graça, os dados são apagados — ver render.com/docs/free) ---
   - name: finflow-db
     databaseName: financeiro
     user: finflow_user
