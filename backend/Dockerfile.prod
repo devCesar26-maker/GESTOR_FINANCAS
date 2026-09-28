@@ -1,15 +1,3 @@
-# Imagem de produção do BACKEND FinFlow.
-#
-# Otimizada para deploy no Render (plano Free):
-# - Dependências instaladas antes do código (cache de build: a camada só é
-#   reconstruída quando requirements.txt muda) e com timeout/retry do pip
-#   para os builders lentos do plano Free.
-# - collectstatic roda no BUILD, não no boot (a janela do health check é
-#   curta; erro de estático derruba o build de forma visível).
-# - ENTRYPOINT ./entrypoint.sh: espera o banco, roda `migrate` e sobe o
-#   Celery embutido ANTES do CMD. Antes desta correção o entrypoint nunca
-#   rodava no Render (CMD sem ENTRYPOINT chamava o gunicorn direto) e o
-#   banco nunca era migrado no deploy.
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -20,19 +8,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# 1. Dependências primeiro (camada cacheável pelo builder).
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 2. Código da aplicação.
 COPY . .
 RUN chmod +x entrypoint.sh
 
-# 3. Estáticos coletados durante o build. Sem `|| true`: se falhar aqui,
-#    o erro aparece no log de build em vez de estourar no boot.
 RUN SECRET_KEY=build_dummy_key python manage.py collectstatic --noinput --clear
 
-# 4. Usuário não-root e permissões.
 RUN useradd --create-home appuser \
     && mkdir -p /app/media /app/staticfiles \
     && chown -R appuser:appuser /app
@@ -43,9 +26,5 @@ EXPOSE 8000
 
 ENTRYPOINT ["./entrypoint.sh"]
 
-# Plano Free (~512 MB): 2 workers com --preload (o fork compartilha a
-# memória do import pesado do Django — sem preload cada worker duplicava a
-# RAM), threads para picos de I/O e reciclagem periódica de workers contra
-# vazamentos de memória. O shell no CMD mantém a expansão de ${PORT} em
-# runtime (Render define PORT); o `exec` entrega o PID ao gunicorn.
-CMD ["sh", "-c", "exec gunicorn finflow.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --threads 2 --preload --timeout 120 --max-requests 300 --max-requests-jitter 50"]
+# Ajustado para 1 worker e 2 threads sem --preload (economiza ~180MB de RAM)
+CMD ["sh", "-c", "exec gunicorn finflow.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 2 --timeout 120 --max-requests 300 --max-requests-jitter 50"]
