@@ -26,14 +26,20 @@ services:
         value: "true"
       - key: SECRET_KEY
         generateValue: true
+      # URL REAL do serviço (Render gera sufixo aleatório ao criar; se
+      # renomear o serviço, atualize aqui). Sem o host correto o Django
+      # rejeita TODA requisição com 400 DisallowedHost — foi o que matou o
+      # health check e causou o "Timed Out" do deploy.
       - key: ALLOWED_HOSTS
-        value: finflow-backend.onrender.com
-      - key: CORS_ALLOWED_ORIGINS
-        value: https://finflow-frontend.onrender.com
+        value: finflow-backend-z6zm.onrender.com
+      # CORS por regex: o Render gera subdomínios com sufixo aleatório que
+      # mudam ao recriar/renomear o serviço; a lista fixa quebraria.
+      - key: CORS_ALLOWED_ORIGIN_REGEXES
+        value: "^https://[a-z0-9-]+\\.onrender\\.com$"
       - key: CSRF_TRUSTED_ORIGINS
-        # Inclui a origem do PRÓPRIO backend: o login do Django admin é
-        # feito no domínio da API e o CSRF check exige a origem explícita.
-        value: https://finflow-frontend.onrender.com,https://finflow-backend.onrender.com
+        # Inclui a origem do PRÓPRIO backend (login do admin) e wildcard
+        # para o frontend, cujo subdomínio pode levar sufixo aleatório.
+        value: https://*.onrender.com,https://finflow-backend-z6zm.onrender.com
       - key: DB_ENGINE
         value: django.db.backends.postgresql
       - key: DB_HOST
@@ -92,7 +98,8 @@ services:
     staticPublishPath: ./frontend/dist
     envVars:
       - key: VITE_API_URL
-        value: https://finflow-backend.onrender.com
+        # URL REAL do backend (mesma do ALLOWED_HOSTS acima).
+        value: https://finflow-backend-z6zm.onrender.com
     routes:
       - type: rewrite
         source: /*

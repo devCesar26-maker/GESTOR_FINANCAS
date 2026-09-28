@@ -184,8 +184,15 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = env_list(
     "CORS_ALLOWED_ORIGINS", default="http://localhost:5173"
 )
-# O refresh token viaja num cookie: si SPA e API estivessem em origens
-# distintas, o navegador exige credenciales explícitas para enviarlas.
+# CORS por REGEX: o Render gera subdomínios com sufixo aleatório
+# (ex.: finflow-backend-z6zm.onrender.com) que mudam ao recriar o serviço —
+# uma lista fixa de origens quebra a cada rename. O regex confia apenas em
+# subdomínios do onrender.com (não é "*").
+CORS_ALLOWED_ORIGIN_REGEXES = env_list(
+    "CORS_ALLOWED_ORIGIN_REGEXES", default=""
+)
+# O refresh token viaja num cookie: se SPA e API estivessem em origens
+# distintas, o navegador exige credenciais explícitas para enviá-las.
 CORS_ALLOW_CREDENTIALS = True
 
 # ---------------------------------------------------------------------------
@@ -345,6 +352,7 @@ SECURE_REDIRECT_EXEMPT = [r"^healthz/$"]
 # Doble envío CSRF: o frontend (vite :5173) envia o header X-CSRFToken nas
 # rotas de token. Em produção frontend+API são mesma origem (whitenoise);
 # em dev o proxy do vite faz o Origin diferir do Host do backend.
+# Aceita wildcard "https://*.onrender.com" (suportado pelo Django).
 CSRF_TRUSTED_ORIGINS = env_list(
     "CSRF_TRUSTED_ORIGINS", default="http://localhost:5173"
 )
