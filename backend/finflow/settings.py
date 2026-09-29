@@ -314,6 +314,40 @@ LEMRETE_DIAS_ANTES = env_int("LEMRETE_DIAS_ANTES", 3)  # DEPRECIADO (compat lega
 # (e não a variável CELERY_BROKER_URL) porque esta seção do arquivo executa
 # ANTES da seção de Celery.
 REDIS_URL = os.getenv("REDIS_URL") or os.getenv("CELERY_BROKER_URL") or "redis://localhost:6379/1"
+
+from urllib.parse import parse_qsl as _parse_qsl, urlencode as _urlencode, urlsplit as _urlsplit, urlunsplit as _urlunsplit
+
+def _normalizar_redis_url(url: str) -> str:
+    """Sanitiza URLs de Redis/Upstash copiadas "na mão" para o painel.
+
+    Dois problemas reais de deploy (Render + Upstash) que derrubam TODO POST
+    com 500 (o cache do rate-limit do DRF toca o Redis antes de qualquer
+    view de escrita):
+      1) Barra dupla/sobrando no fim (ex.: ...:6379//) — o Celery tolera, o
+         RedisCache do Django não;
+      2) rediss:// SEM ssl_cert_reqs — redis-py de versões intermediárias
+         levanta "A rediss:// URL must have parameter ssl_cert_reqs".
+    Normalização: colapsa o path vazio para "/", preserva o número de DB
+    (ex.: /1 do compose de dev) e injeta ssl_cert_reqs=CERT_REQUIRED em
+    rediss:// quando ausente (Upstash exige TLS verificado).
+    """
+    if not url:
+        return url
+    partes = _urlsplit(url.strip())
+    path = partes.path
+    # Barra(s) sobrando de copy-paste ("//" ou "/") colapsam para "/" (db 0);
+    # path vazio é preservado como está — a URL correta do painel sai intacta.
+    if path == "//":
+        path = "/"
+    query = dict(_parse_qsl(partes.query, keep_blank_values=True))
+    if partes.scheme == "rediss" and "ssl_cert_reqs" not in query:
+        query["ssl_cert_reqs"] = "CERT_REQUIRED"
+    return _urlunsplit(
+        (partes.scheme, partes.netloc, path, _urlencode(query), partes.fragment)
+    )
+
+
+REDIS_URL = _normalizar_redis_url(REDIS_URL)
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
@@ -324,7 +358,9 @@ CACHES = {
 # ---------------------------------------------------------------------------
 # Celery
 # ---------------------------------------------------------------------------
-CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+CELERY_BROKER_URL = _normalizar_redis_url(
+    os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+)
 # Sem CELERY_RESULT_BACKEND explícito, reaproveita o broker (mesma instância
 # Redis — ex.: Upstash Free expõe uma única URL): resultados ficam em chaves
 # celery-task-meta-* na mesma DB, sem colisão com as filas do broker.
