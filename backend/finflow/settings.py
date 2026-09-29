@@ -341,7 +341,7 @@ def _normalizar_redis_url(url: str) -> str:
         path = "/"
     query = dict(_parse_qsl(partes.query, keep_blank_values=True))
     if partes.scheme == "rediss" and "ssl_cert_reqs" not in query:
-        query["ssl_cert_reqs"] = "CERT_REQUIRED"
+        query["ssl_cert_reqs"] = "required"
     return _urlunsplit(
         (partes.scheme, partes.netloc, path, _urlencode(query), partes.fragment)
     )
