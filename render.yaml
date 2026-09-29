@@ -77,11 +77,32 @@ services:
       # fica "live".
       - key: TRUST_PROXY
         value: "1"
-      # Regex cobre o subdomínio aleatório do frontend (e do próprio backend).
-      - key: CORS_ALLOWED_ORIGIN_REGEXES
-        value: '^https://[a-z0-9-]+\.onrender\.com$'
+      # CORS/CSRF com origens EXATAS (não wildcard): o Render resolve o host
+      # real de cada serviço (com sufixo aleatório) na criação do Blueprint e
+      # mantém em sync nos redeploys. Lista fechada = um co-tenant malicioso
+      # em outro *.onrender.com NÃO recebe Access-Control-Allow-Origin nem
+      # consegue ler o header X-CSRFSecret do /api/csrf/ (com credenciais,
+      # regex amplo permitiria isso — por isso foi removido).
+      - key: CORS_ALLOWED_ORIGINS
+        fromService:
+          type: web
+          name: finflow-backend
+          property: host
+      - key: CORS_ALLOWED_ORIGINS_EXTRA
+        fromService:
+          type: web
+          name: gestor-financeiro
+          property: host
       - key: CSRF_TRUSTED_ORIGINS
-        value: https://*.onrender.com
+        fromService:
+          type: web
+          name: finflow-backend
+          property: host
+      - key: CSRF_TRUSTED_ORIGINS_EXTRA
+        fromService:
+          type: web
+          name: gestor-financeiro
+          property: host
       # SPA e API em subdomínios DIFERENTES = contexto cross-site: os cookies
       # (csrftoken e refresh_token) só viajam no XHR com SameSite=None.
       # Em dev (mesma origem via proxy Vite) o padrão Lax é mantido.

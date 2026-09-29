@@ -1,13 +1,15 @@
 """Views do app Usuarios."""
 import logging
+from functools import wraps
 
 from django.conf import settings
 from django.http import HttpResponse, JsonResponse
+from django.middleware.csrf import _unmask_cipher_token, get_token
+from django.utils.crypto import constant_time_compare
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import (
     csrf_protect,
     ensure_csrf_cookie,
-    get_token,
 )
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
@@ -58,6 +60,73 @@ def csrf_failure_json(request, reason=""):
     )
 
 
+# ---------------------------------------------------------------------------
+# CSRF cross-origin (deploy Render: SPA e API em subdomínios DIFERENTES)
+# ---------------------------------------------------------------------------
+# O cookie csrftoken vive no domínio da API e o JavaScript da SPA (outro
+# subdomínio) NÃO consegue lê-lo — é a Same-Origin Policy impedindo um
+# atacante de roubar o token. Como o duplo envio clássico fica impossível,
+# adotamos um fallback em DUPLA CHAVE (synchronizer token clássico):
+#   1) GET /api/csrf/ devolve o segredo CSRF cru no header de resposta
+#      X-CSRFSecret (exposto à SPA via CORS_EXPOSE_HEADERS — ver settings);
+#   2) a SPA guarda o segredo e o envia no header X-CSRFSecret;
+#   3) aqui, o segredo do header é comparado (em tempo constante) com o
+#      cookie csrftoken: saber o segredo prova que a origem já recebeu uma
+#      resposta legítima desta API — e o cookie nunca é exposto a outras
+#      origens (CORS + Same-Origin Policy). Mesma origem, o fluxo clássico
+#      (cookie + X-CSRFToken) segue valendo e este fallback é ignorado.
+CSRF_SECRET_HEADER = "HTTP_X_CSRFSECRET"
+
+
+def _aplicar_csrf_fallback_cross_origin(request) -> None:
+    """Valida a dupla chave X-CSRFSecret + cookie csrftoken (cross-origin).
+
+    Válida: marca a request para o CsrfViewMiddleware NÃO rejeitá-la (mesma
+    mecânica do APIClient do DRF). O par cookie/segredo vale enquanto o
+    cookie csrftoken for válido — mesma longevidade do duplo envio clássico,
+    em que o JS reenvia o MESMO valor do cookie a cada escrita. O segredo
+    não é de uso único: o process_request do csrf_protect relê o cookie
+    depois desta função, então rotação aqui seria sobrescrita sem efeito.
+    Inválida/ausente: não faz NADA — o middleware segue o fluxo normal
+    (403 JSON em CSRF_FAILURE_VIEW), inclusive para o fluxo same-origin.
+    """
+    segredo = (request.META.get(CSRF_SECRET_HEADER) or "").strip()
+    cookie = request.COOKIES.get(settings.CSRF_COOKIE_NAME) or ""
+    if not segredo or not cookie:
+        return
+
+    # Compat entre versões do Django: em 5.1+ o cookie guarda o SEGREDO cru
+    # (32 chars); até a 5.0, guardava o token MASCARADO (máscara+cifra, 64
+    # chars) — desmascarar revela o segredo. A comparação em tempo constante
+    # prova que a origem já recebeu uma resposta legítima desta API.
+    if len(segredo) != 32:
+        return
+    if len(cookie) == 64:
+        cookie = _unmask_cipher_token(cookie)
+    elif len(cookie) != 32:
+        return
+    if not constant_time_compare(cookie, segredo):
+        return
+
+    request._dont_enforce_csrf_checks = True
+
+
+def csrf_fallback_cross_origin(method):
+    """Decorator: valida a dupla chave ANTES do csrf_protect decorar o POST.
+
+    Os decorators executam de fora para dentro: este precisa ficar ACIMA de
+    @method_decorator(csrf_protect) na pilha, ou a validação clássica roda
+    primeiro e rejeitaria (403) uma escrita cross-origin legítima.
+    """
+
+    @wraps(method)
+    def wrapper(self, request, *args, **kwargs):
+        _aplicar_csrf_fallback_cross_origin(request)
+        return method(self, request, *args, **kwargs)
+
+    return wrapper
+
+
 def csrf_token_view(request):
     """GET público: define o cookie csrftoken para o duplo envio CSRF.
 
@@ -68,9 +137,29 @@ def csrf_token_view(request):
     afeta views que renderizam template com {% csrf_token %} (e o test
     client não o lê). get_token(request) gera o token e injeta
     Set-Cookie: csrftoken=... na resposta.
+
+    Deploy CROSS-ORIGIN (Render: SPA e API em subdomínios diferentes): o JS
+    da SPA não consegue ler o cookie do domínio da API (Same-Origin Policy)
+    — o duplo envio clássico seria impossível. Por isso a resposta devolve
+    também o segredo CSRF cru no header X-CSRFSecret (exposto via
+    CORS_EXPOSE_HEADERS); a SPA o envia no header X-CSRFSecret e o backend
+    autentica a escrita pela dupla chave segredo+cookie (ver
+    _aplicar_csrf_fallback_cross_origin). Mesma origem (dev/proxy Vite):
+    fluxo idêntico ao de antes, sem header extra.
     """
     response = HttpResponse(status=status.HTTP_204_NO_CONTENT)
     get_token(request)  # gera (se necessário) e seta o cookie csrftoken
+    # O segredo cru vive em request.META["CSRF_COOKIE"]: em Django 5.1+ é ele
+    # o valor do cookie (32 chars); até a 5.0 o cookie guardava o token
+    # mascarado (64) e o segredo vinha de _unmask_cipher_token. Só é exposto
+    # a quem já recebeu UMA resposta legítima desta API — e a SPA
+    # cross-origin não consegue lê-lo do cookie, daí o header (o CORS
+    # restringe QUEM lê esta resposta).
+    segredo = request.META.get("CSRF_COOKIE") or ""
+    if len(segredo) == 64:
+        segredo = _unmask_cipher_token(segredo)
+    if segredo:
+        response["X-CSRFSecret"] = segredo
     return response
 
 
@@ -96,6 +185,7 @@ class TokenObtainPairCookieView(TokenObtainPairThrottledView):
     def dispatch(self, request, *args, **kwargs):
         return super().dispatch(request, *args, **kwargs)
 
+    @csrf_fallback_cross_origin
     @method_decorator(csrf_protect)
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -122,6 +212,7 @@ class TokenRefreshCookieView(TokenRefreshView):
     def dispatch(self, request, *args, **kwargs):
         return super().dispatch(request, *args, **kwargs)
 
+    @csrf_fallback_cross_origin
     @method_decorator(csrf_protect)
     def post(self, request, *args, **kwargs):
         refresh = request.COOKIES.get(REFRESH_COOKIE_NAME)

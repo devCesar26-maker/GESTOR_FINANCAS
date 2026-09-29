@@ -333,4 +333,71 @@ describe('bootstrap do csrftoken', () => {
 
     expect(csrfCalls).toBe(1) // single-flight do fetch de CSRF
   })
+
+  it('cross-origin: guarda o segredo do /api/csrf/ e envia X-CSRFSecret nas escritas', async () => {
+    // Deploy Render: a SPA não consegue ler o cookie da API (outro subdomínio).
+    // O backend devolve o segredo no header X-CSRFSecret (exposto via CORS)
+    // e a SPA o envia no header X-CSRFSecret nas escritas.
+    let csrfCalls = 0
+    server.use(
+      http.get('/api/csrf/', () => {
+        csrfCalls += 1
+        document.cookie = 'csrftoken=csrf-fresco; path=/'
+        return new HttpResponse(null, {
+          status: 204,
+          headers: { 'X-CSRFSecret': `segredo-${csrfCalls}` },
+        })
+      }),
+      http.post('/api/clientes/', ({ request }) =>
+        HttpResponse.json(
+          {
+            csrf: request.headers.get('X-CSRFToken'),
+            secret: request.headers.get('X-CSRFSecret'),
+          },
+          { status: 201 },
+        ),
+      ),
+    )
+
+    const client = await carregarClient()
+    const response = await client.default.post('/clientes/', { nome: 'Teste' })
+
+    expect(csrfCalls).toBe(1)
+    expect(response.data.secret).toBe('segredo-1') // fallback cross-origin
+    // No navegador REAL os cookies ficam em jars separados (domínios
+    // distintos): o placeholder local da SPA e o cookie da API. O jsdom tem
+    // um jar único, então o placeholder semeado (= segredo) sobrescreve o
+    // plantado pelo handler — e o X-CSRFToken leva o valor do placeholder.
+    // O backend cross-origin valida APENAS a dupla chave X-CSRFSecret +
+    // cookie da API; o X-CSRFToken segue para o fluxo same-origin.
+    expect(response.data.csrf).toBe('segredo-1')
+  })
+
+  it('segredo em cache não dispara novo GET /api/csrf/ nas escritas seguintes', async () => {
+    let csrfCalls = 0
+    server.use(
+      http.get('/api/csrf/', () => {
+        csrfCalls += 1
+        document.cookie = `csrftoken=csrf-${csrfCalls}; path=/`
+        return new HttpResponse(null, {
+          status: 204,
+          headers: { 'X-CSRFSecret': `segredo-${csrfCalls}` },
+        })
+      }),
+      http.post('/api/clientes/', ({ request }) =>
+        HttpResponse.json(
+          { csrf: request.headers.get('X-CSRFToken'), secret: request.headers.get('X-CSRFSecret') },
+          { status: 201 },
+        ),
+      ),
+    )
+
+    const client = await carregarClient()
+    await client.default.post('/clientes/', { nome: 'A' })
+    await client.default.post('/clientes/', { nome: 'B' })
+
+    // O cookie local semeado (same-origin em dev) está presente: nenhuma
+    // chamada extra — o par cookie/segredo vale enquanto o cookie for válido.
+    expect(csrfCalls).toBe(1)
+  })
 })

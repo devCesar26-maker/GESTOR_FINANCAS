@@ -245,7 +245,9 @@ Configuração 100% por ambiente — nada sensível no código. Principais vari�
 | `FINFLOW_FAVORECIDO_PIX`                                                              | *(vazio)*                        | Nome do favorecido PIX nos lembretes                               |
 | `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND`                                       | `redis://localhost:6379/0`       | Broker/resultados do Celery                                        |
 | `REDIS_URL`                                                                           | `redis://localhost:6379/1`       | Cache/throttling                                                   |
-| `CORS_ALLOWED_ORIGINS`                                                                | `http://localhost:5173`          | Origens autorizadas (vírgula)                                     |
+| `CORS_ALLOWED_ORIGINS`                                                                | `http://localhost:5173`          | Origens autorizadas (vírgula). **Lista exata** — evite regex amplo com credenciais |
+| `CORS_ALLOWED_ORIGINS_EXTRA`                                                          | *(vazio)*                        | Origens extras somadas à lista acima (deploy Render via `fromService`) |
+| `CSRF_TRUSTED_ORIGINS` / `_EXTRA`                                                     | `http://localhost:5173`          | Idem, para o CsrfViewMiddleware do Django                       |
 | `SECURE_SSL_REDIRECT` etc.                                                            | `not DEBUG`                      | Headers de segurança (HSTS, cookies secure)                       |
 
 Frontend:

@@ -222,19 +222,53 @@ SPECTACULAR_SETTINGS = {
 # CORS
 # ---------------------------------------------------------------------------
 CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = env_list(
-    "CORS_ALLOWED_ORIGINS", default="http://localhost:5173"
-)
-# CORS por REGEX: o Render gera subdomínios com sufixo aleatório
-# (ex.: finflow-backend-z6zm.onrender.com) que mudam ao recriar o serviço —
-# uma lista fixa de origens quebra a cada rename. O regex confia apenas em
-# subdomínios do onrender.com (não é "*").
+
+def _norm_origin(origem: str) -> str:
+    """Normaliza uma origem para o formato esquema://host que o CORS exige.
+
+    O fromService property: host do Render devolve só o domínio (sem
+    "https://") — sem esta normalização uma lista explícita de origens
+    NUNCA casaria e a SPA ficaria sem Access-Control-Allow-Origin.
+    """
+    origem = origem.strip().rstrip("/")
+    if origem and not origem.startswith(("http://", "https://")):
+        # Render só serve HTTPS.
+        origem = f"https://{origem}"
+    return origem
+
+
+CORS_ALLOWED_ORIGINS = [
+    _norm_origin(item)
+    for item in env_list("CORS_ALLOWED_ORIGINS", default="http://localhost:5173")
+    + env_list("CORS_ALLOWED_ORIGINS_EXTRA", default="")
+    if _norm_origin(item)
+]
+# Deduplica preservando a ordem (backend e frontend podem coincidir).
+CORS_ALLOWED_ORIGINS = list(dict.fromkeys(CORS_ALLOWED_ORIGINS))
+
+# CORS por REGEX: ESCAPE-HATCH para quando os hosts exatos ainda não são
+# conhecidos (primeiro deploy via Blueprint, renames). NÃO use em produção
+# estável: '^https://[a-z0-9-]+\\.onrender\\.com$' autoriza QUALQUER
+# subdomínio do Render — com CORS_ALLOW_CREDENTIALS um co-tenant malicioso
+# (app gratuita no mesmo PaaS) poderia ler respostas autenticadas dos seus
+# usuários. Lista exata em CORS_ALLOWED_ORIGINS >> regex ampla.
 CORS_ALLOWED_ORIGIN_REGEXES = env_list(
     "CORS_ALLOWED_ORIGIN_REGEXES", default=""
 )
 # O refresh token viaja num cookie: se SPA e API estivessem em origens
 # distintas, o navegador exige credenciais explícitas para enviá-las.
 CORS_ALLOW_CREDENTIALS = True
+
+# O fallback CSRF cross-origin usa um header próprio: X-CSRFSecret (a SPA
+# não consegue ler o cookie da API em outro subdomínio; ver
+# apps.usuarios.views). O default do django-cors-headers já inclui
+# "x-csrftoken", mas não "x-csrfsecret" — e o GET /api/csrf/ devolve o
+# segredo NESTE header de resposta: precisa estar em CORS_EXPOSE_HEADERS
+# para o JS da SPA (origem diferente) conseguir lê-lo.
+from corsheaders.defaults import default_headers
+
+CORS_ALLOW_HEADERS = list(default_headers) + ["x-csrfsecret"]
+CORS_EXPOSE_HEADERS = ["x-csrfsecret"]
 
 # ---------------------------------------------------------------------------
 # E-mail (django-anymail)
@@ -409,10 +443,20 @@ SECURE_REDIRECT_EXEMPT = [r"^healthz/$"]
 # Doble envío CSRF: o frontend (vite :5173) envia o header X-CSRFToken nas
 # rotas de token. Em produção frontend+API são mesma origem (whitenoise);
 # em dev o proxy do vite faz o Origin diferir do Host do backend.
-# Aceita wildcard "https://*.onrender.com" (suportado pelo Django).
-CSRF_TRUSTED_ORIGINS = env_list(
-    "CSRF_TRUSTED_ORIGINS", default="http://localhost:5173"
-)
+# Deploy RENDER: origens EXATAS via fromService (o Render resolve o host
+# real — com sufixo aleatório — na criação do Blueprint e mantém em sync nos
+# redeploys). Lista fechada = um co-tenant do Render (app maliciosa em
+# outro *.onrender.com) NÃO recebe Access-Control-Allow-Origin nem consegue
+# ler o header X-CSRFSecret (CORS_EXPOSE_HEADERS) — sem isso, o fallback
+# CSRF cross-origin poderia ser burlado por outro app da plataforma.
+CSRF_TRUSTED_ORIGINS = [
+    _norm_origin(item)
+    for item in env_list("CSRF_TRUSTED_ORIGINS", default="http://localhost:5173")
+    + env_list("CSRF_TRUSTED_ORIGINS_EXTRA", default="")
+    if _norm_origin(item)
+]
+# Deduplica preservando a ordem.
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS))
 
 # 403 CSRF em formato JSON (a API é consumida por JS, não por formulários).
 CSRF_FAILURE_VIEW = "apps.usuarios.views.csrf_failure_json"

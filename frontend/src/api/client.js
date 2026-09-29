@@ -23,6 +23,11 @@ export const BACKEND_ORIGIN = API_ORIGIN
 
 const api = axios.create({
   baseURL: `${API_ORIGIN}/api`,
+  // Deploy cross-origin (SPA e API em subdomínios diferentes): sem isto o
+  // navegador NÃO envia nem guarda os cookies da API (csrftoken e o httpOnly
+  // do refresh token) — o login/refresh quebraria. Em dev (same-origin via
+  // proxy Vite) a flag é inofensiva.
+  withCredentials: true,
 })
 
 // ---------------------------------------------------------------------------
@@ -108,6 +113,15 @@ function lerCookie(nome) {
   return match ? decodeURIComponent(match[1]) : null
 }
 
+// Deploy CROSS-ORIGIN (Render: SPA e API em subdomínios diferentes): o JS da
+// SPA não consegue ler o cookie csrftoken do domínio da API (Same-Origin
+// Policy). O backend então entrega o segredo CSRF cru no header de resposta
+// X-CSRFSecret do GET /api/csrf/ (exposto à SPA via CORS_EXPOSE_HEADERS) e
+// aceita a dupla chave segredo (header X-CSRFSecret) + cookie (que só o
+// navegador da origem autorizada envia). Mesma origem (dev), o cookie é
+// legível e este segredo simplesmente não é necessário.
+let csrfSecret = null
+
 // Devolve o valor ATUAL do cookie csrftoken; só dispara GET /api/csrf/ se o
 // cookie ainda não existe. O cookie pode rotar no backend, então o valor é
 // lido do document.cookie a cada escrita (barato e sempre atual) — o cache
@@ -125,7 +139,19 @@ function garantirCsrfToken() {
       // Via PELA INSTÂNCIA api (baseURL certa no Render); em dev é igual a
       // GET /api/csrf/ de antes. Seguro contra loop: o interceptor só chama
       // garantirCsrfToken em métodos de ESCRITA, e este é um GET.
-      .then(() => lerCookie('csrftoken'))
+      .then((response) => {
+        // Cross-origin: o cookie da API não é legível — o segredo vem no
+        // header de resposta (axios normaliza o nome para minúsculas).
+        // Semeamos o cookie local para o bootstrap não refazer o GET em cada
+        // escrita (o backend também seta o cookie REAL via Set-Cookie, que o
+        // navegador guarda mesmo sem o JS conseguir lê-lo).
+        const segredo = response.headers?.['x-csrfsecret']
+        if (segredo) {
+          csrfSecret = segredo
+          document.cookie = `csrftoken=${segredo}; path=/`
+        }
+        return lerCookie('csrftoken')
+      })
       .finally(() => {
         // Libera para nova tentativa se o cookie não tiver sido setado.
         csrfFetchPromise = null
@@ -134,8 +160,17 @@ function garantirCsrfToken() {
   return csrfFetchPromise
 }
 
+// Limpeza local do CSRF (logout/expiração): o par cookie/segredo continua
+// válido no backend enquanto o cookie csrftoken for válido — mesmo modelo do
+// duplo envio clássico, em que o JS reenvia o MESMO valor do cookie.
+function invalidarCsrfLocal() {
+  csrfSecret = null
+  document.cookie = 'csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
+}
+
 function limpiarSesion() {
   accessToken = null
+  invalidarCsrfLocal()
   // Chaves LEGADAS do fluxo antigo (access/refresh em localStorage): removidas
   // para limpar resíduos de sessões anteriores à migração para memória.
   localStorage.removeItem('finflow_access')
@@ -178,7 +213,7 @@ function renovarAccessToken() {
 
 const METODOS_COM_CSRF = new Set(['post', 'put', 'patch', 'delete'])
 
-// Injeta o access token JWT (da memória) e (em escritas) o X-CSRFToken.
+// Injeta o access token JWT (da memória) e (em escritas) o duplo envio CSRF.
 api.interceptors.request.use(async (config) => {
   const token = getAccessToken()
   if (token) {
@@ -191,6 +226,12 @@ api.interceptors.request.use(async (config) => {
     const csrf = await garantirCsrfToken()
     if (csrf) {
       config.headers['X-CSRFToken'] = csrf
+    }
+    // Cross-origin: o cookie csrftoken da API não é legível pela SPA, então
+    // o duplo envio clássico é impossível — envia o segredo recebido no body
+    // de GET /api/csrf/ (o backend valida a dupla chave segredo + cookie).
+    if (csrfSecret) {
+      config.headers['X-CSRFSecret'] = csrfSecret
     }
   }
 
