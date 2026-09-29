@@ -361,6 +361,13 @@ CACHES = {
 CELERY_BROKER_URL = _normalizar_redis_url(
     os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
 )
+# SEM esta normalização, um CELERY_RESULT_BACKEND separado no painel (com a
+# URL antiga) derruba o cadastro: o RegistroAPIView faz .delay() do e-mail de
+# boas-vindas e o RedisBackend do Celery levanta ValueError ao construir —
+# 500 na view inteira, mesmo com broker e cache já corrigidos.
+CELERY_RESULT_BACKEND = _normalizar_redis_url(
+    os.getenv("CELERY_RESULT_BACKEND") or CELERY_BROKER_URL
+)
 # Sem CELERY_RESULT_BACKEND explícito, reaproveita o broker (mesma instância
 # Redis — ex.: Upstash Free expõe uma única URL): resultados ficam em chaves
 # celery-task-meta-* na mesma DB, sem colisão com as filas do broker.

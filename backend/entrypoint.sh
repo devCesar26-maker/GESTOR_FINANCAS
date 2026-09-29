@@ -18,6 +18,30 @@ fi
 echo "[entrypoint] Aplicando migrações..."
 python manage.py migrate --noinput
 
+# Diagnóstico de infra (falha AQUI no boot, não como 500 cego no request):
+# o ValueError de ssl_cert_reqs/URL malformada do Redis só explode na PRIMEIRA
+# escrita (rate-limit do DRF, .delay do registro) — derrubando o worker do
+# Gunicorn e virando 500 sem traceback visível nos logs do request.
+python - <<'EOF'
+import os, django
+django.setup()
+from finflow.settings import CELERY_BROKER_URL, REDIS_URL
+print("[entrypoint] CELERY_BROKER_URL efetiva:", CELERY_BROKER_URL.split("@")[-1])
+print("[entrypoint] REDIS_URL (cache) efetiva:  ", REDIS_URL.split("@")[-1])
+from django.core.cache import cache
+try:
+    cache.set("finflow-boot-check", "1", 30)
+    print("[entrypoint] Cache Redis: OK")
+except Exception as e:
+    print("[entrypoint] Cache Redis: FALHOU ->", type(e).__name__, str(e)[:200])
+try:
+    from celery import current_app
+    current_app.backend
+    print("[entrypoint] Celery result backend: OK")
+except Exception as e:
+    print("[entrypoint] Celery result backend: FALHOU ->", type(e).__name__, str(e)[:200])
+EOF
+
 # Superuser de dev (somente DEBUG=true; no docker-compose local).
 if [ "${DEBUG:-}" = "true" ] || [ "${DEBUG:-}" = "True" ]; then
     if [ -f scripts/ensure_dev_superuser.py ]; then
