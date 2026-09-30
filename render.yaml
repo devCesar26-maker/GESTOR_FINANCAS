@@ -156,6 +156,19 @@ services:
         source: /*
         destination: /index.html
     headers:
+      # Cabeçalhos globais de segurança HTTP (mitigação de vulnerabilidades OWASP ZAP)
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: wss:;"
       # Assets do Vite têm hash no nome: cache agressivo e seguro.
       - path: /assets/*
         name: Cache-Control

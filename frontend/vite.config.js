@@ -6,6 +6,14 @@ import react from '@vitejs/plugin-react'
 // (VITE_PROXY_TARGET é definido no compose).
 export default defineConfig({
   plugins: [react()],
+  esbuild: {
+    drop: ['console', 'debugger'],
+    legalComments: 'none',
+  },
+  build: {
+    sourcemap: false,
+    minify: 'esbuild',
+  },
   server: {
     host: true,
     port: 5173,
