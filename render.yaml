@@ -1,18 +1,13 @@
 # ---------------------------------------------------------------------------
 # FinFlow — Blueprint de deploy no Render (plano FREE)
 #
-# Arquitetura (2 serviços, tudo 100% no plano gratuito):
+# Arquitetura (2 serviços + 1 banco PostgreSQL, 100% plano gratuito):
 #   1) finflow-backend  (type: web, docker) — Django + Gunicorn, com Celery
-#      Worker (-P solo) e Beat EMBUTIDOS no mesmo container (entrypoint.sh),
-#      poupando um Background Worker pago. Banco e broker são EXTERNOS e
-#      gratuitos: Supabase (Postgres, DATABASE_URL) e Upstash (Redis,
-#      CELERY_BROKER_URL) — preenchidos à mão no painel (sync: false).
-#   2) finflow-frontend (runtime: static) — SPA React/Vite publicada na CDN
-#      do Render, com rewrite de todas as rotas para /index.html.
+#      Worker (-P solo) e Beat EMBUTIDOS no mesmo container (entrypoint.sh).
+#   2) finflow-frontend (runtime: static) — SPA React/Vite na CDN do Render.
+#   3) finflow-db       (database: postgres) — PostgreSQL nativo do Render (free).
 #
-# Aplicar: Render Dashboard → New → Blueprint → apontar para este repo
-# (o render.yaml precisa estar na RAIZ). Depois, em finflow-backend →
-# Environment, preencha DATABASE_URL e CELERY_BROKER_URL (veja comentários).
+# Aplicar: Render Dashboard → New → Blueprint → apontar para este repo.
 # ---------------------------------------------------------------------------
 
 services:
@@ -51,14 +46,11 @@ services:
       - key: SECRET_KEY
         generateValue: true
 
-      # --- Infra externa GRATUITA (preencher manualmente no painel) --------
-      # Supabase → Project Settings → Database → Connection string:
-      #   use a URI do POOLER (porta 6543) p/ Free, ex.:
-      #   postgresql://postgres.<ref>:<senha>@aws-0-<regiao>.pooler.supabase.com:6543/postgres
-      #   (o settings.py detecta a porta 6543 e desabilita cursores
-      #   server-side automaticamente; sslmode=require é o padrão).
+      # --- Banco de Dados PostgreSQL Nativo do Render (Plano Free) ----------
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: finflow-db
+          property: connectionString
       # Upstash → Redis → Endpoint details: copie a conexão TLS, ex.:
       #   rediss://default:<senha>@<host>.upstash.io:6379
       #   (O settings.py reutiliza esta URL no cache de rate-limit quando
@@ -176,3 +168,14 @@ services:
       - path: /index.html
         name: Cache-Control
         value: no-cache
+
+# ===========================================================================
+# C) BANCO DE DADOS — PostgreSQL Gerenciado no Render (Plano Free)
+# ===========================================================================
+databases:
+  - name: finflow-db
+    databaseName: finflow
+    user: finflow_user
+    plan: free
+    region: oregon
+
