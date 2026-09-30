@@ -157,10 +157,10 @@ services:
         value: nosniff
       - path: /*
         name: Strict-Transport-Security
-        value: max-age=31536000; includeSubDomains
+        value: max-age=31536000; includeSubDomains; preload
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:;"
+        value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://*.cloudinary.com https://*.onrender.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.onrender.com wss://*.onrender.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self';"
       # Assets do Vite têm hash no nome: cache agressivo e seguro.
       - path: /assets/*
         name: Cache-Control
