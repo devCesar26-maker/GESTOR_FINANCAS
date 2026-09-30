@@ -24,7 +24,7 @@
 
 ## Aplicação ao vivo
 
-> 🔗 _(link será adicionado após o deploy em produção)_
+> 🔗 [gestor-financeiro-h91s.onrender.com](https://gestor-financeiro-h91s.onrender.com/)
 
 ---
 
@@ -233,22 +233,22 @@ backend (em http://localhost:8000 por padrão, configurável via
 Configuração 100% por ambiente — nada sensível no código. Principais variáveis
 (backend):
 
-| Variável                                                                               | Padrão                            | Descrição                                                        |
-| --------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------ |
-| `SECRET_KEY`                                                                          | `dev-only-change-me-em-producao` | Chave do Django (**troque em produção**)                   |
-| `DEBUG`                                                                               | `false`                          | Em produção deixe`false`                                       |
-| `ALLOWED_HOSTS`                                                                       | `localhost,127.0.0.1`            | Hosts separados por vírgula                                       |
-| `DB_ENGINE` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` / `DB_HOST` / `DB_PORT` | PostgreSQL local                   | Conexão com o banco                                               |
-| `BREVO_API_KEY`                                                                       | *(vazio)*                        | Com a chave, e-mails partem via Brevo; sem ela, backend de console |
-| `DEFAULT_FROM_EMAIL`                                                                  | `FinFlow <...>`                  | Remetente dos e-mails transacionais                                |
-| `FINFLOW_CHAVE_PIX`                                                                   | *(vazio)*                        | Chave PIX exibida nos lembretes de cobrança                       |
-| `FINFLOW_FAVORECIDO_PIX`                                                              | *(vazio)*                        | Nome do favorecido PIX nos lembretes                               |
-| `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND`                                       | `redis://localhost:6379/0`       | Broker/resultados do Celery                                        |
-| `REDIS_URL`                                                                           | `redis://localhost:6379/1`       | Cache/throttling                                                   |
-| `CORS_ALLOWED_ORIGINS`                                                                | `http://localhost:5173`          | Origens autorizadas (vírgula). **Lista exata** — evite regex amplo com credenciais |
-| `CORS_ALLOWED_ORIGINS_EXTRA`                                                          | *(vazio)*                        | Origens extras somadas à lista acima (deploy Render via `fromService`) |
-| `CSRF_TRUSTED_ORIGINS` / `_EXTRA`                                                     | `http://localhost:5173`          | Idem, para o CsrfViewMiddleware do Django                       |
-| `SECURE_SSL_REDIRECT` etc.                                                            | `not DEBUG`                      | Headers de segurança (HSTS, cookies secure)                       |
+| Variável                                                                               | Padrão                            | Descrição                                                                               |
+| --------------------------------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------- |
+| `SECRET_KEY`                                                                          | `dev-only-change-me-em-producao` | Chave do Django (**troque em produção**)                                          |
+| `DEBUG`                                                                               | `false`                          | Em produção deixe`false`                                                              |
+| `ALLOWED_HOSTS`                                                                       | `localhost,127.0.0.1`            | Hosts separados por vírgula                                                              |
+| `DB_ENGINE` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` / `DB_HOST` / `DB_PORT` | PostgreSQL local                   | Conexão com o banco                                                                      |
+| `BREVO_API_KEY`                                                                       | *(vazio)*                        | Com a chave, e-mails partem via Brevo; sem ela, backend de console                        |
+| `DEFAULT_FROM_EMAIL`                                                                  | `FinFlow <...>`                  | Remetente dos e-mails transacionais                                                       |
+| `FINFLOW_CHAVE_PIX`                                                                   | *(vazio)*                        | Chave PIX exibida nos lembretes de cobrança                                              |
+| `FINFLOW_FAVORECIDO_PIX`                                                              | *(vazio)*                        | Nome do favorecido PIX nos lembretes                                                      |
+| `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND`                                       | `redis://localhost:6379/0`       | Broker/resultados do Celery                                                               |
+| `REDIS_URL`                                                                           | `redis://localhost:6379/1`       | Cache/throttling                                                                          |
+| `CORS_ALLOWED_ORIGINS`                                                                | `http://localhost:5173`          | Origens autorizadas (vírgula).**Lista exata** — evite regex amplo com credenciais |
+| `CORS_ALLOWED_ORIGINS_EXTRA`                                                          | *(vazio)*                        | Origens extras somadas à lista acima (deploy Render via`fromService`)                  |
+| `CSRF_TRUSTED_ORIGINS` / `_EXTRA`                                                   | `http://localhost:5173`          | Idem, para o CsrfViewMiddleware do Django                                                 |
+| `SECURE_SSL_REDIRECT` etc.                                                            | `not DEBUG`                      | Headers de segurança (HSTS, cookies secure)                                              |
 
 Frontend:
 
