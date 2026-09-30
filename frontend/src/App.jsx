@@ -3,8 +3,10 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { getAccessToken, initAuth } from './api/client'
 import Clientes from './pages/Clientes'
 import Dashboard from './pages/Dashboard'
+import EsqueceuSenha from './pages/EsqueceuSenha'
 import Faturas from './pages/Faturas'
 import Login from './pages/Login'
+import RedefinirSenha from './pages/RedefinirSenha'
 import Registro from './pages/Registro'
 
 // Bootstrap da autenticação: o silent refresh roda UMA vez no carregamento
@@ -32,6 +34,9 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/registro" element={<Registro />} />
+      {/* Fluxo de recuperação de senha (links do e-mail caem aqui). */}
+      <Route path="/esqueceu-senha" element={<EsqueceuSenha />} />
+      <Route path="/redefinir-senha/:uid/:token" element={<RedefinirSenha />} />
       <Route
         path="/"
         element={

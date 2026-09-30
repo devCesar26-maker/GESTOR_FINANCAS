@@ -3,10 +3,16 @@ import logging
 from functools import wraps
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.core.mail import send_mail
 from django.http import HttpResponse, JsonResponse
 from django.middleware.csrf import _unmask_cipher_token, get_token
+from django.template.loader import render_to_string
 from django.utils.crypto import constant_time_compare
 from django.utils.decorators import method_decorator
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.views.decorators.csrf import (
     csrf_protect,
     ensure_csrf_cookie,
@@ -19,9 +25,16 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from .serializers import RegistroResponseSerializer, RegistroSerializer
+from .serializers import (
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
+    RegistroResponseSerializer,
+    RegistroSerializer,
+)
 
 logger = logging.getLogger(__name__)
+
+User = get_user_model()
 
 # ---------------------------------------------------------------------------
 # Cookie do refresh token (httpOnly, Secure, SameSite=Strict)
@@ -297,3 +310,244 @@ class RegistroAPIView(generics.CreateAPIView):
             | {"detail": "Conta criada com sucesso. Faça login para obter o token."},
             status=status.HTTP_201_CREATED,
         )
+
+
+# ---------------------------------------------------------------------------
+# Reset de senha por e-mail
+# ---------------------------------------------------------------------------
+# Token único do Django (PasswordResetTokenGenerator): HMAC sobre o estado
+# do usuário (senha, último login, e-mail) — expira em PASSWORD_RESET_TIMEOUT
+# (1 hora, ver settings), invalida-se quando a senha muda e é de uso
+# garantido apenas uma vez. O uid vai codificado em base64 na URL.
+
+
+def _enviar_email_reset(user, token: str, request) -> None:
+    """Envia o e-mail de recuperação com o link para redefinir a senha.
+
+    O link aponta para a SPA (frontend), que extrai uid/token da URL e
+    chama POST /api/auth/password-reset/confirm/. O domínio vem da env var
+    FINFLOW_FRONTEND_URL (deploy Render: SPA e API em subdomínios
+    diferentes); sem ela, usa o Host da requisição — correto em dev e no
+    docker-compose (mesma origem via proxy do Vite/Nginx).
+    """
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    frontend = (settings.FINFLOW_FRONTEND_URL or "").rstrip("/")
+    if frontend:
+        link = f"{frontend}/redefinir-senha/{uid}/{token}"
+    else:
+        esquema = "https" if request.is_secure() else "http"
+        link = f"{esquema}://{request.get_host()}/redefinir-senha/{uid}/{token}"
+
+    contexto = {
+        "nome": (user.get_full_name() or user.username).strip(),
+        "email": user.email,
+        "link": link,
+        "validade_horas": 1,
+    }
+    assunto = (
+        render_to_string("usuarios/emails/password_reset_assunto.txt", contexto)
+        .strip()
+    )
+    corpo_html = render_to_string("usuarios/emails/password_reset.html", contexto)
+
+    send_mail(
+        subject=assunto,
+        message="",
+        html_message=corpo_html,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+
+
+class PasswordResetRequestView(APIView):
+    """POST público: valida o e-mail e envia o link de recuperação.
+
+    Resposta SEMPRE 200 — nunca revela se o e-mail existe (anti
+    user-enumeration). Rate limit próprio (5/min por IP) para não virar
+    vetor de e-mail bombing via Brevo.
+    """
+
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "senha"
+
+    @extend_schema(
+        tags=["Autenticação"],
+        summary="Solicitar link de redefinição de senha",
+        description=(
+            "Envia um e-mail com link de recuperação (válido por 1 hora) "
+            "quando o e-mail pertence a uma conta ativa. Resposta sempre 200, "
+            "sem revelar existência da conta."
+        ),
+        request=PasswordResetRequestSerializer,
+        responses={200: None},
+        auth=[],
+    )
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"].strip().lower()
+
+        user = User.objects.filter(email__iexact=email, is_active=True).first()
+        if user:
+            try:
+                _enviar_email_reset(
+                    user,
+                    PasswordResetTokenGenerator().make_token(user),
+                    request,
+                )
+            except Exception:
+                # Falha de envio NUNCA vaza no corpo da resposta (o 200 é
+                # idêntico com ou sem conta) — só no log do servidor.
+                logger.exception("Falha ao enviar e-mail de reset para %s", email)
+
+        return Response(
+            {"detail": "Se este e-mail estiver cadastrado, você receberá um link de recuperação em instantes."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class PasswordResetConfirmView(APIView):
+    """POST público: redefine a senha a partir de uid + token do e-mail.
+
+    A nova senha passa pela política forte (SenhaForteValidator via
+    AUTH_PASSWORD_VALIDATORS). Tokens são de uso único e válidos por 1 hora
+    (PASSWORD_RESET_TIMEOUT); um reset bem-sucedido invalida os tokens
+    seguintes (o gerador dependia da hash antiga da senha).
+    """
+
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "senha"
+
+    @extend_schema(
+        tags=["Autenticação"],
+        summary="Redefinir a senha com uid e token",
+        description=(
+            "Valida o par uid/token do e-mail de recuperação (válido por 1 hora) "
+            "e define a nova senha, que deve cumprir a política forte."
+        ),
+        request=PasswordResetConfirmSerializer,
+        responses={200: None},
+        auth=[],
+    )
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        uid = serializer.validated_data["uid"]
+        token = serializer.validated_data["token"]
+        password = serializer.validated_data["password"]
+
+        try:
+            user = User.objects.get(pk=force_str(urlsafe_base64_decode(uid)))
+        except (User.DoesNotExist, ValueError, TypeError, OverflowError):
+            return Response(
+                {"detail": "Link inválido ou expirado. Solicite um novo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not PasswordResetTokenGenerator().check_token(user, token):
+            return Response(
+                {"detail": "Link inválido ou expirado. Solicite um novo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.set_password(password)
+        user.save(update_fields=["password"])
+        return Response(
+            {"detail": "Senha redefinida com sucesso. Faça login com a nova senha."},
+            status=status.HTTP_200_OK,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Login/Cadastro com Google (OAuth 2.0 via id_token)
+# ---------------------------------------------------------------------------
+
+
+class GoogleLoginView(APIView):
+    """POST público: troca o id_token do Google por JWTs do FinFlow.
+
+    Fluxo (Google Identity Services): o frontend carrega o botão oficial
+    do Google, recebe o id_token (JWT assinado pelo Google) e o envia aqui.
+    O allauth valida o token (assinatura via chaves públicas do Google,
+    issuer, audience == GOOGLE_CLIENT_ID, expiração), resolve a conta:
+
+    - SocialAccount já vinculado → login direto;
+    - e-mail de usuário LOCAL existente → vincula e loga (sem duplicar
+      conta, sem alterar senha — ver apps.usuarios.adapters);
+    - e-mail novo → cria a conta (username = e-mail, sem senha).
+
+    A resposta é EXATAMENTE a mesma do login JWT clássico: access token no
+    body e refresh token num cookie httpOnly (path restrito a
+    /api/token/refresh/) — o frontend trata os dois fluxos igualmente.
+    """
+
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
+
+    @extend_schema(
+        tags=["Autenticação"],
+        summary="Entrar/Cadastrar com Google",
+        description=(
+            "Recebe o id_token emitido pelo Google Identity Services, valida "
+            "assinatura/issuer/audience, associa ou cria a conta e devolve o "
+            "access token (o refresh vai no cookie httpOnly)."
+        ),
+        request=None,
+        responses={200: None, 400: None, 503: None},
+        auth=[],
+    )
+    def post(self, request):
+        from rest_framework.exceptions import ValidationError
+
+        if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+            return Response(
+                {"detail": "Login com Google não está configurado neste servidor."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        id_token = (request.data or {}).get("id_token", "")
+        if not id_token or not isinstance(id_token, str):
+            raise ValidationError({"id_token": "Informe o id_token do Google."})
+
+        from allauth.socialaccount.helpers import complete_social_login
+        from allauth.socialaccount.providers.google.provider import GoogleProvider
+        from allauth.socialaccount.providers.google.views import (
+            GoogleOAuth2Adapter,
+        )
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        adapter = GoogleOAuth2Adapter(request)
+        provider = adapter.get_provider()
+
+        try:
+            sociallogin = provider.verify_token(request, {"id_token": id_token})
+            # Associa/cria o usuário e o registra como autenticado no
+            # request (sessão do allauth usada só internamente aqui).
+            complete_social_login(request, sociallogin)
+        except DjangoValidationError as e:
+            return Response(
+                {"detail": "Token do Google inválido ou expirado."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = getattr(sociallogin, "user", None)
+        if user is None or user.pk is None:
+            return Response(
+                {"detail": "Não foi possível autenticar com o Google."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Mesmo contrato do TokenObtainPairCookieView: access no body,
+        # refresh no cookie httpOnly.
+        from rest_framework_simplejwt.tokens import RefreshToken
+
+        refresh = RefreshToken.for_user(user)
+        response = Response(
+            {"access": str(refresh.access_token)}, status=status.HTTP_200_OK
+        )
+        _set_refresh_cookie(response, str(refresh))
+        return response

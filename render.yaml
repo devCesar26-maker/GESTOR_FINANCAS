@@ -108,6 +108,21 @@ services:
         sync: false
       - key: DEFAULT_FROM_EMAIL
         value: FinFlow <projetodefinancas34@gmail.com>
+      # Domínio da SPA: base dos links de "redefinir senha" nos e-mails
+      # (SPA e API em subdomínios diferentes no Render — o Host da API não
+      # serve de base para o link). Ex.: https://gestor-financeiro.onrender.com
+      - key: FINFLOW_FRONTEND_URL
+        sync: false
+
+      # --- Login com Google (OAuth 2.0) ------------------------------------
+      # Google Cloud Console → Credenciais → ID do cliente OAuth 2.0 (Web).
+      # Origem autorizada: a URL do backend; Redirect (se usar fluxo web):
+      # a URL do backend + /admin/. O MESMO client id vai ao frontend em
+      # VITE_GOOGLE_CLIENT_ID. Preencher no painel após o primeiro deploy.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
       # Recomendado no Render Free: disco é EFÊMERO a cada deploy — comprovantes
       # (/media/) só persistem com Cloudinary configurado.
       - key: CLOUDINARY_CLOUD_NAME
@@ -142,6 +157,12 @@ services:
           type: web
           name: finflow-backend
           property: host
+      # Mesmo client id do Google configurado no backend (GOOGLE_CLIENT_ID):
+      # o botão "Entrar com Google" só aparece quando esta variável existe.
+      # IMPORTANTE: VITE_* é variável de BUILD — alterou aqui, faça
+      # "Clear cache & deploy" no frontend.
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
     # SPA: qualquer rota cai no index.html (React Router resolve client-side).
     routes:
       - type: rewrite

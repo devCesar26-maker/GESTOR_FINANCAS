@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../api/client'
+import BotaoGoogle from '../components/BotaoGoogle'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -169,6 +170,16 @@ export default function Registro() {
             {loading ? 'Criando conta...' : 'Criar conta'}
           </button>
         </form>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '1rem 0' }}>
+          <div style={{ flex: 1, height: '1px', background: 'var(--border, #e5e7eb)' }} />
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ou</span>
+          <div style={{ flex: 1, height: '1px', background: 'var(--border, #e5e7eb)' }} />
+        </div>
+
+        {/* O cadastro com Google usa o MESMO endpoint do login: e-mail novo
+            cria a conta automaticamente no backend (ver /api/auth/google/). */}
+        <BotaoGoogle texto="Cadastrar com Google" />
 
         <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
           Já tem uma conta? <Link to="/login" style={{ fontWeight: 600 }}>Entrar</Link>

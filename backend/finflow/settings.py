@@ -50,10 +50,17 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Terceiros
     "rest_framework",
+    "rest_framework.authtoken",  # exigido pelo dj-rest-auth (TokenModel)
     "drf_spectacular",
     "corsheaders",
     "django_filters",
     "anymail",
+    # OAuth social (Google) + endpoints REST de conta (dj-rest-auth)
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.google",
+    "dj_rest_auth",
     # Apps do FinFlow
     "apps.usuarios",
     "apps.clientes",
@@ -79,6 +86,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Exigido pelo django-allauth (mesmo usando só os fluxos de API).
+    "allauth.account.middleware.AccountMiddleware",
 ]
 
 ROOT_URLCONF = "finflow.urls"
@@ -184,6 +193,9 @@ REST_FRAMEWORK = {
         # minuto por IP nos endpoints públicos de autenticação.
         "login": "5/minute",
         "registro": "5/minute",
+        # Solicitação de reset de senha dispara e-mail: limite próprio para
+        # evitar uso do endpoint como vetor de e-mail bombing.
+        "senha": "5/minute",
     },
 }
 
@@ -191,6 +203,80 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+# Reset de senha: o token do e-mail expira em 1 hora (spec do produto).
+PASSWORD_RESET_TIMEOUT = 60 * 60
+# Domínio da SPA para montar links de e-mails (reset de senha). No Render,
+# SPA e API ficam em subdomínios diferentes — o Host da API não serve de
+# base para o link. Vazio em dev/docker-compose (mesma origem).
+FINFLOW_FRONTEND_URL = os.getenv("FINFLOW_FRONTEND_URL", "")
+
+# ---------------------------------------------------------------------------
+# django-allauth (base para o login social com Google)
+# ---------------------------------------------------------------------------
+# O FinFlow NÃO usa os fluxos de sessão/forms do allauth: ele entra como
+# camada de validação do id_token do Google, com dj-rest-auth fazendo a
+# ponte para a API REST. Contas do Google são associadas a usuários LOCAIS
+# existentes pelo e-mail (case-insensitive) — ver apps.usuarios.adapters
+# (associação manual: o mecanismo nativo apagaria a senha de usuários
+# antigos cujo e-mail não tem registro de verificação no allauth).
+ACCOUNT_EMAIL_VERIFICATION = "none"
+# Sem username no signup social (o username local = e-mail, padrão FinFlow).
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
+ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_UNIQUE_EMAIL = True
+
+SOCIALACCOUNT_ADAPTER = "apps.usuarios.adapters.SocialAccountAdapter"
+
+# Credenciais do Google Cloud OAuth 2.0 (Console → Credenciais → ID do
+# cliente OAuth 2.0, tipo "Aplicativo Web"). Sem elas configuradas, o
+# endpoint /api/auth/google/ responde 503 com mensagem clara.
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        # Login com Google Identity Services (id_token do frontend);
+        # sem fluxo OAuth de código em duas etapas.
+        "FLOWS": ["id_token"],
+        # Scope mínimo: e-mail + perfil básico.
+        "SCOPE": ["openid", "profile", "email"],
+        "APP": {
+            "client_id": GOOGLE_CLIENT_ID,
+            "secret": GOOGLE_CLIENT_SECRET,
+            "key": "",
+        },
+    }
+}
+
+SOCIALACCOUNT_EMAIL_REQUIRED = True
+SOCIALACCOUNT_EMAIL_VERIFICATION = "none"
+SOCIALACCOUNT_QUERY_EMAIL = True
+
+# ---------------------------------------------------------------------------
+# dj-rest-auth — ponte allauth ↔ DRF
+# ---------------------------------------------------------------------------
+# Mesmo modelo de sessão do resto da API: access token no body, refresh
+# token num cookie httpOnly (path restrito a /api/token/refresh/). O login
+# social devolve EXATAMENTE o mesmo contrato do TokenObtainPairCookieView.
+REST_AUTH = {
+    "USE_JWT": True,
+    "JWT_AUTH_COOKIE": None,
+    # Deve refletir REFRESH_COOKIE_NAME/REFRESH_COOKIE_PATH de
+    # apps.usuarios.views (definidos lá para evitar import circular;
+    # aqui ficam os valores brutos). O dj-rest-auth escreve o refresh no
+    # MESMO cookie httpOnly que o login JWT clássico.
+    "JWT_AUTH_REFRESH_COOKIE": "refresh_token",
+    "JWT_AUTH_HTTPONLY": True,
+    # Mesma env var do REFRESH_COOKIE_SAMESITE (definido mais abaixo na
+    # seção de segurança — referenciar aqui daria NameError de ordem).
+    "JWT_AUTH_SAMESITE": os.getenv("REFRESH_COOKIE_SAMESITE", "Lax"),
+    "JWT_AUTH_SECURE": True,
+    "JWT_AUTH_COOKIE_USE_CSRF": True,
+    "SESSION_LOGIN": False,
+    # Projeto usa JWT (SimpleJWT); nada de tokens opaque do DRF.
+    "TOKEN_MODEL": None,
 }
 
 AUTH_PASSWORD_VALIDATORS = [

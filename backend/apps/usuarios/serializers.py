@@ -1,4 +1,4 @@
-"""Serializer de registro de usuário."""
+"""Serializers do app Usuarios (registro, reset de senha, Google OAuth)."""
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -50,3 +50,31 @@ class RegistroResponseSerializer(serializers.Serializer):
     nome = serializers.CharField(read_only=True, source="first_name")
     email = serializers.EmailField(read_only=True)
     detail = serializers.CharField(read_only=True)
+
+
+# ---------------------------------------------------------------------------
+# Reset de senha por e-mail
+# ---------------------------------------------------------------------------
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    """Corpo do POST /api/auth/password-reset/: apenas o e-mail."""
+
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """Corpo do POST /api/auth/password-reset/confirm/: uid, token e senha.
+
+    O par (uid, token) é gerado pelo PasswordResetTokenGenerator do Django
+    (token único de 1 hora, invalidado se a senha mudar ou ao logar). A
+    nova senha passa pela política SenhaForteValidator (settings).
+    """
+
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    password = serializers.CharField(write_only=True, style={"input_type": "password"})
+
+    def validate_password(self, value: str) -> str:
+        validate_password(value)
+        return value

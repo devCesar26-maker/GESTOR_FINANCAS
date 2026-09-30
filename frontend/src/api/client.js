@@ -102,13 +102,34 @@ export function initAuth() {
 // ---------------------------------------------------------------------------
 // Refresh automático de JWT
 // ---------------------------------------------------------------------------
-// Endpoints que NÃO usam autenticação (login, refresh, registro): um 401
-// deles significa credencial inválida, não token expirado — nunca se deve
-// tentar renovar a sessão por causa dessas respostas.
-const RUTAS_PUBLICAS = ['/token/', '/token/refresh/', '/auth/registro/']
+// Endpoints que NÃO usam autenticação (login, refresh, registro, reset de
+// senha e Google): um 401 deles significa credencial inválida, não token
+// expirado — nunca se deve tentar renovar a sessão por causa dessas respostas.
+const RUTAS_PUBLICAS = [
+  '/token/',
+  '/token/refresh/',
+  '/auth/registro/',
+  '/auth/password-reset/',
+  '/auth/google/',
+]
 
 function esRutaPublica(url) {
   return RUTAS_PUBLICAS.some((ruta) => url?.includes(ruta))
+}
+
+// ---------------------------------------------------------------------------
+// Login/Cadastro com Google (OAuth 2.0 via id_token)
+// ---------------------------------------------------------------------------
+// O botão oficial do Google (GoogleLogin de @react-oauth/google) entrega o
+// id_token (JWT assinado pelo Google) e nós o trocamos pelos JWTs nativos
+// do FinFlow: access token no retorno (memória) e refresh token no cookie
+// httpOnly — exatamente o mesmo contrato do login por senha.
+export async function loginComGoogle(idToken) {
+  const response = await api.post('/auth/google/', { id_token: idToken })
+  // Mesma semântica do handleSubmit do Login: token só em memória; o
+  // refresh chega num cookie httpOnly setado pelo backend.
+  accessToken = response.data.access
+  return response.data
 }
 
 // ---------------------------------------------------------------------------

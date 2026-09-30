@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import api, { setAccessToken } from '../api/client'
+import BotaoGoogle from '../components/BotaoGoogle'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -8,6 +9,8 @@ export default function Login() {
 
   // Voltou do cadastro bem-sucedido: mostra aviso e preenche o e-mail.
   const contaCriada = location.state?.contaCriada
+  // Voltou da redefinição de senha bem-sucedida: mostra aviso de sucesso.
+  const senhaRedefinida = location.state?.senhaRedefinida
   const usuarioInicial = contaCriada ?? 'admin'
 
   const [username, setUsername] = useState(usuarioInicial)
@@ -60,6 +63,19 @@ export default function Login() {
           </div>
         )}
 
+        {senhaRedefinida && (
+          <div
+            className="alert-error"
+            style={{
+              background: 'rgba(16, 185, 129, 0.12)',
+              borderColor: 'rgba(16, 185, 129, 0.45)',
+              color: '#34d399',
+            }}
+          >
+            Senha redefinida com sucesso. Entre com a nova senha.
+          </div>
+        )}
+
         {error && <div className="alert-error">{error}</div>}
 
         <form onSubmit={handleSubmit}>
@@ -91,6 +107,18 @@ export default function Login() {
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
+
+        <p style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.875rem' }}>
+          <Link to="/esqueceu-senha" style={{ fontWeight: 600 }}>Esqueceu a senha?</Link>
+        </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '1rem 0' }}>
+          <div style={{ flex: 1, height: '1px', background: 'var(--border, #e5e7eb)' }} />
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ou</span>
+          <div style={{ flex: 1, height: '1px', background: 'var(--border, #e5e7eb)' }} />
+        </div>
+
+        <BotaoGoogle texto="Entrar com Google" />
 
         <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
           Não tem uma conta? <Link to="/registro" style={{ fontWeight: 600 }}>Criar conta</Link>
