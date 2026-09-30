@@ -10,11 +10,21 @@ import axios from 'axios'
 // Tolerante ao formato: aceita com ou sem "https://" (o fromService
 // property: host do Render devolve só o domínio) e com ou sem sufixo "/api".
 const rawApiUrl = (import.meta.env?.VITE_API_URL || '').trim()
-const comEsquema = /^[a-z][a-z0-9+.-]*:\/\//i.test(rawApiUrl)
+let comEsquema = /^[a-z][a-z0-9+.-]*:\/\//i.test(rawApiUrl)
   ? rawApiUrl
   : rawApiUrl
     ? `https://${rawApiUrl}`
     : ''
+
+if (
+  comEsquema &&
+  !comEsquema.includes('.') &&
+  typeof window !== 'undefined' &&
+  window.location.hostname.endsWith('.onrender.com')
+) {
+  comEsquema = `${comEsquema}.onrender.com`
+}
+
 const API_ORIGIN = comEsquema.replace(/\/+$/, '').replace(/\/api\/?$/i, '')
 
 // Origem do backend para recursos FORA de /api (ex.: download de comprovantes
