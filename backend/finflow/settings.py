@@ -234,6 +234,9 @@ def _norm_origin(origem: str) -> str:
     if origem and not origem.startswith(("http://", "https://")):
         # Render só serve HTTPS.
         origem = f"https://{origem}"
+    host_part = origem.split("://")[-1]
+    if host_part and "." not in host_part and "localhost" not in host_part:
+        origem = f"{origem}.onrender.com"
     return origem
 
 
