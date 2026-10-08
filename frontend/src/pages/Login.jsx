@@ -80,13 +80,17 @@ export default function Login() {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Usuário</label>
+            <label className="form-label">Usuário ou e-mail</label>
+            {/* Aceita username OU e-mail: o backend autentica ambos
+                (ModelBackend por username; contas FinFlow têm username =
+                e-mail, então e-mail também bate no ModelBackend). */}
             <input
               type="text"
               className="form-input"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Nome de usuário"
+              placeholder="E-mail ou nome de usuário"
+              autoComplete="username"
               required
             />
           </div>

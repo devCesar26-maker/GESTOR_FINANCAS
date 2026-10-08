@@ -224,8 +224,22 @@ FINFLOW_FRONTEND_URL = os.getenv("FINFLOW_FRONTEND_URL", "")
 ACCOUNT_EMAIL_VERIFICATION = "none"
 # Sem username no signup social (o username local = e-mail, padrão FinFlow).
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
-ACCOUNT_LOGIN_METHODS = {"email"}
+# Login aceita username OU e-mail (allauth 65+: ACCOUNT_AUTHENTICATION_METHOD
+# é o nome legado — segue aceito com aviso de deprecação; ACCOUNT_LOGIN_METHODS
+# é o substituto). Mantidos em sync: "username_email" ⇔ {"username", "email"}.
+ACCOUNT_AUTHENTICATION_METHOD = "username_email"
+ACCOUNT_LOGIN_METHODS = {"username", "email"}
+ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_UNIQUE_EMAIL = True
+
+# Backend de auth: o ModelBackend autentica o login JWT clássico
+# (/api/token/), e o AuthenticationBackend do allauth é exigido pelo fluxo
+# social do Google (complete_social_login). Sem o allauth no topo, o Google
+# LoginView falha com "No authentication backend".
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
 
 SOCIALACCOUNT_ADAPTER = "apps.usuarios.adapters.SocialAccountAdapter"
 
