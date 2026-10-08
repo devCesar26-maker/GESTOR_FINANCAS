@@ -30,6 +30,7 @@ from .serializers import (
     PasswordResetRequestSerializer,
     RegistroResponseSerializer,
     RegistroSerializer,
+    TokenObtainPairEmailSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -181,9 +182,11 @@ class TokenObtainPairThrottledView(TokenObtainPairView):
 
     O ScopedRateThrottle usa o scope "login" (ver DEFAULT_THROTTLE_RATES
     no settings) e, como o usuário ainda não está autenticado, identifica
-    por IP.
+    por IP. Usa o serializer customizado que aceita e-mail OU username no
+    campo `username` (ver TokenObtainPairEmailSerializer).
     """
 
+    serializer_class = TokenObtainPairEmailSerializer
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "login"
 

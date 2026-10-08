@@ -1,10 +1,48 @@
 """Serializers do app Usuarios (registro, reset de senha, Google OAuth)."""
 
+import re
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 User = get_user_model()
+
+
+# ---------------------------------------------------------------------------
+# Login JWT (SimpleJWT) com e-mail OU username
+# ---------------------------------------------------------------------------
+
+# Aproximação suficiente para decidir se o valor digitado parece um e-mail.
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+class TokenObtainPairEmailSerializer(TokenObtainPairSerializer):
+    """TokenObtainPairSerializer que aceita e-mail no campo `username`.
+
+    O ModelBackend do Django autentica APENAS pelo username — quando o
+    frontend envia o e-mail no campo de login, o authenticate() falha e o
+    endpoint /api/token/ responde 401. Aqui, ANTES de validar as
+    credenciais, um valor que pareça e-mail é resolvido para o username da
+    conta correspondente (match case-insensitive), e a validação padrão do
+    SimpleJWT segue com as credenciais corretas. Se o valor não parece um
+    e-mail (ou não existe conta com esse e-mail), segue como username —
+    comportamento idêntico ao padrão do SimpleJWT.
+    """
+
+    def validate(self, attrs: dict) -> dict:
+        username = attrs.get(self.username_field) or ""
+        if _EMAIL_RE.match(username.strip()):
+            candidato = (
+                User.objects.filter(
+                    email__iexact=username.strip(), is_active=True
+                ).values_list("username", flat=True).first()
+            )
+            if candidato:
+                attrs = dict(attrs)
+                attrs[self.username_field] = candidato
+        return super().validate(attrs)
 
 
 class RegistroSerializer(serializers.ModelSerializer):
