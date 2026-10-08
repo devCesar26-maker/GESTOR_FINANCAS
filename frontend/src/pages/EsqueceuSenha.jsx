@@ -25,7 +25,7 @@ export default function EsqueceuSenha() {
 
     setLoading(true)
     try {
-      await api.post('/auth/password-reset/', { email: emailTrim })
+      await api.post('/auth/password/reset/', { email: emailTrim })
       setEnviado(true)
     } catch (err) {
       console.error(err)

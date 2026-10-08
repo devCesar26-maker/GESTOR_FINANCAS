@@ -2,9 +2,9 @@
 Testes do reset de senha por e-mail e do login/cadastro com Google.
 
 Cobre a spec do produto:
-- POST /api/auth/password-reset/ — envia link com token único de 1 hora
+- POST /api/auth/password/reset/ — envia link com token único de 1 hora
   (PasswordResetTokenGenerator) SEM revelar se o e-mail existe;
-- POST /api/auth/password-reset/confirm/ — valida uid+token e redefine a
+- POST /api/auth/password/reset/confirm/ — valida uid+token e redefine a
   senha (política forte; token de uso único);
 - POST /api/auth/google/ — troca id_token do Google por JWTs nativos
   (access no body, refresh no cookie httpOnly).
@@ -17,8 +17,8 @@ from rest_framework import status
 
 from apps.usuarios.views import REFRESH_COOKIE_NAME
 
-RESET_URL = "/api/auth/password-reset/"
-RESET_CONFIRM_URL = "/api/auth/password-reset/confirm/"
+RESET_URL = "/api/auth/password/reset/"
+RESET_CONFIRM_URL = "/api/auth/password/reset/confirm/"
 GOOGLE_URL = "/api/auth/google/"
 TOKEN_URL = "/api/token/"
 
@@ -48,7 +48,7 @@ def _uid_de(user) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Solicitação de reset (POST /api/auth/password-reset/)
+# Solicitação de reset (POST /api/auth/password/reset/)
 # ---------------------------------------------------------------------------
 
 
@@ -114,7 +114,7 @@ def test_solicitar_reset_limitado_a_5_por_minuto(api_client, user):
 
 
 # ---------------------------------------------------------------------------
-# Confirmação do reset (POST /api/auth/password-reset/confirm/)
+# Confirmação do reset (POST /api/auth/password/reset/confirm/)
 # ---------------------------------------------------------------------------
 
 
@@ -128,10 +128,10 @@ def _criar_token(user) -> tuple[str, str]:
     return uid, token
 
 
-def _confirmar(api_client, uid, token, password=SENHA_NOVA):
+def _confirmar(api_client, uid, token, new_password=SENHA_NOVA):
     return api_client.post(
         RESET_CONFIRM_URL,
-        {"uid": uid, "token": token, "password": password},
+        {"uid": uid, "token": token, "new_password": new_password},
         format="json",
     )
 
@@ -199,7 +199,7 @@ def test_reset_confirm_rejeita_senha_fraca(api_client, user):
     response = _confirmar(api_client, uid, token, "fraca123")
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "password" in response.data
+    assert "new_password" in response.data
     # Senha permanece a antiga.
     user.refresh_from_db()
     assert not user.check_password("fraca123")

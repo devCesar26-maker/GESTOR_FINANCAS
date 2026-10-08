@@ -326,10 +326,29 @@ def _norm_origin(origem: str) -> str:
     return origem
 
 
+# Origem da SPA fixada em código (fallback): o Render resolve as fromService
+# do Blueprint (CORS/CSRF *_EXTRA), mas se o Blueprint não for reaplicado
+# após renome/recriação do serviço, a SPA fica sem CORS/CSRF e o login e o
+# reset de senha quebram com erro de origem. Preferir atualizar via env vars
+# no painel; a lista em código é a última linha de defesa.
+ORIGENS_FIXAS_FRONTEND = ["https://gestor-financeiro-h91s.onrender.com"]
+
+# Fallback do domínio da SPA para os links de e-mail (reset de senha): se a
+# env var FINFLOW_FRONTEND_URL não foi preenchida no painel do Render, os
+# links apontariam para o Host da API (request.get_host()) — onde não existe
+# SPA — e o fluxo de redefinição quebraria. Usar a mesma origem fixa de
+# CORS/CSRF garante link correto em produção sem depender do painel.
+# Condicionado a RENDER=true (o Render injeta em todos os serviços) para não
+# mudar deploys self-hosted de mesma origem (docker-compose.prod), onde o
+# fallback request.get_host() continua correto.
+if not FINFLOW_FRONTEND_URL and os.getenv("RENDER") == "true" and ORIGENS_FIXAS_FRONTEND:
+    FINFLOW_FRONTEND_URL = ORIGENS_FIXAS_FRONTEND[0]
+
 CORS_ALLOWED_ORIGINS = [
     _norm_origin(item)
     for item in env_list("CORS_ALLOWED_ORIGINS", default="http://localhost:5173")
     + env_list("CORS_ALLOWED_ORIGINS_EXTRA", default="")
+    + ORIGENS_FIXAS_FRONTEND
     if _norm_origin(item)
 ]
 # Deduplica preservando a ordem (backend e frontend podem coincidir).
@@ -585,6 +604,7 @@ CSRF_TRUSTED_ORIGINS = [
     _norm_origin(item)
     for item in env_list("CSRF_TRUSTED_ORIGINS", default="http://localhost:5173")
     + env_list("CSRF_TRUSTED_ORIGINS_EXTRA", default="")
+    + ORIGENS_FIXAS_FRONTEND
     if _norm_origin(item)
 ]
 # Deduplica preservando a ordem.

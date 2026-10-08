@@ -47,10 +47,10 @@ export default function RedefinirSenha() {
 
     setLoading(true)
     try {
-      await api.post('/auth/password-reset/confirm/', {
+      await api.post('/auth/password/reset/confirm/', {
         uid,
         token,
-        password: senha,
+        new_password: senha,
       })
       // Sucesso: volta ao login com aviso amigável (mesmo mecanismo do
       // "contaCriada" usado pelo Registro).
@@ -61,7 +61,7 @@ export default function RedefinirSenha() {
       console.error(err)
       setError(
         err.response?.data?.detail ??
-          err.response?.data?.password?.[0] ??
+          err.response?.data?.new_password?.[0] ??
           'Não foi possível redefinir a senha. Solicite um novo link.',
       )
     } finally {

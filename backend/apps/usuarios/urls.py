@@ -13,12 +13,12 @@ urlpatterns = [
     path("auth/registro/", RegistroAPIView.as_view(), name="auth-registro"),
     # Reset de senha por e-mail (token único de 1 hora).
     path(
-        "auth/password-reset/",
+        "auth/password/reset/",
         PasswordResetRequestView.as_view(),
         name="auth-password-reset",
     ),
     path(
-        "auth/password-reset/confirm/",
+        "auth/password/reset/confirm/",
         PasswordResetConfirmView.as_view(),
         name="auth-password-reset-confirm",
     ),

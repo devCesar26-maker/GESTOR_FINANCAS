@@ -17,6 +17,7 @@ frontend/dist/
 # Variáveis de ambiente
 .env
 .env.local
+.venv/
 .venv-test/
 # IDE / SO
 .vscode/

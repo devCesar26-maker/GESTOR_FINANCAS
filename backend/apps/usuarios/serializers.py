@@ -58,23 +58,24 @@ class RegistroResponseSerializer(serializers.Serializer):
 
 
 class PasswordResetRequestSerializer(serializers.Serializer):
-    """Corpo do POST /api/auth/password-reset/: apenas o e-mail."""
+    """Corpo do POST /api/auth/password/reset/: apenas o e-mail."""
 
     email = serializers.EmailField()
 
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
-    """Corpo do POST /api/auth/password-reset/confirm/: uid, token e senha.
+    """Corpo do POST /api/auth/password/reset/confirm/: uid, token e senha.
 
     O par (uid, token) é gerado pelo PasswordResetTokenGenerator do Django
     (token único de 1 hora, invalidado se a senha mudar ou ao logar). A
-    nova senha passa pela política SenhaForteValidator (settings).
+    nova senha (new_password) passa pela política SenhaForteValidator
+    (settings).
     """
 
     uid = serializers.CharField()
     token = serializers.CharField()
-    password = serializers.CharField(write_only=True, style={"input_type": "password"})
+    new_password = serializers.CharField(write_only=True, style={"input_type": "password"})
 
-    def validate_password(self, value: str) -> str:
+    def validate_new_password(self, value: str) -> str:
         validate_password(value)
         return value

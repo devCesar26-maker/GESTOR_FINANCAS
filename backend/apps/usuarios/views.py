@@ -325,7 +325,7 @@ def _enviar_email_reset(user, token: str, request) -> None:
     """Envia o e-mail de recuperação com o link para redefinir a senha.
 
     O link aponta para a SPA (frontend), que extrai uid/token da URL e
-    chama POST /api/auth/password-reset/confirm/. O domínio vem da env var
+    chama POST /api/auth/password/reset/confirm/. O domínio vem da env var
     FINFLOW_FRONTEND_URL (deploy Render: SPA e API em subdomínios
     diferentes); sem ela, usa o Host da requisição — correto em dev e no
     docker-compose (mesma origem via proxy do Vite/Nginx).
@@ -437,7 +437,7 @@ class PasswordResetConfirmView(APIView):
         serializer.is_valid(raise_exception=True)
         uid = serializer.validated_data["uid"]
         token = serializer.validated_data["token"]
-        password = serializer.validated_data["password"]
+        new_password = serializer.validated_data["new_password"]
 
         try:
             user = User.objects.get(pk=force_str(urlsafe_base64_decode(uid)))
@@ -453,7 +453,7 @@ class PasswordResetConfirmView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user.set_password(password)
+        user.set_password(new_password)
         user.save(update_fields=["password"])
         return Response(
             {"detail": "Senha redefinida com sucesso. Faça login com a nova senha."},

@@ -109,7 +109,7 @@ const RUTAS_PUBLICAS = [
   '/token/',
   '/token/refresh/',
   '/auth/registro/',
-  '/auth/password-reset/',
+  '/auth/password/reset/',
   '/auth/google/',
 ]
 
