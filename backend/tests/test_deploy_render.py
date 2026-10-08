@@ -187,8 +187,13 @@ def test_login_cross_origin_com_segredo_e_cookie_passa_no_csrf(settings, user):
 
 
 @pytest.mark.django_db
-def test_login_cross_origin_com_segredo_errado_rejeitado(settings, user):
-    """Segredo que não corresponde ao cookie NÃO libera o POST (403)."""
+def test_login_cross_origin_com_segredo_errado_nao_bloqueia(settings, user):
+    """Segredo errado no login NÃO gera mais 403 CSRF.
+
+    O login não exige mais CSRF (ver TokenObtainPairThrottledView): sem a
+    dupla chave válida a request simplesmente segue para a validação de
+    credenciais — com credenciais corretas, 200 (não 403 CSRF).
+    """
     for key, value in ENV.items():
         setattr(settings, key, value)
     _segredo, cookie = _segredo_e_cookie()
@@ -202,15 +207,18 @@ def test_login_cross_origin_com_segredo_errado_rejeitado(settings, user):
         HTTP_ORIGIN=ORIGIN_FRONTEND,
         HTTP_X_CSRFSECRET="A" * 32,
     )
-    assert response.status_code == 403
+    # CSRF ignorado no login: credenciais válidas autenticam normalmente.
+    assert response.status_code == 200
+    assert "access" in response.json()
 
 
 @pytest.mark.django_db
-def test_login_cross_origin_com_segredo_sem_cookie_rejeitado(settings):
-    """Segredo SEM o cookie da API é inútil: 403 (a dupla chave é obrigatória).
+def test_login_cross_origin_sem_cookie_nao_da_403(settings):
+    """Login sem cookie csrftoken NÃO gera mais 403 CSRF.
 
-    É isso que impede um atacante de outro site de forjar o header: o cookie
-    só é anexado pelo navegador em origens autorizadas pelo CORS.
+    O login não exige mais CSRF (ver TokenObtainPairThrottledView): sem o
+    cookie, a dupla chave não se forma e a request segue para a validação
+    de credenciais — com credenciais inválidas, 401 (não 403 CSRF).
     """
     for key, value in ENV.items():
         setattr(settings, key, value)
@@ -224,7 +232,7 @@ def test_login_cross_origin_com_segredo_sem_cookie_rejeitado(settings):
         HTTP_ORIGIN=ORIGIN_FRONTEND,
         HTTP_X_CSRFSECRET=segredo,
     )
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 @pytest.mark.django_db

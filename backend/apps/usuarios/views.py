@@ -184,9 +184,19 @@ class TokenObtainPairThrottledView(TokenObtainPairView):
     no settings) e, como o usuário ainda não está autenticado, identifica
     por IP. Usa o serializer customizado que aceita e-mail OU username no
     campo `username` (ver TokenObtainPairEmailSerializer).
+
+    Sem autenticação de sessão e sem CSRF a propósito: a resposta devolve
+    access token (viaja no header Authorization) e o refresh vai num cookie
+    httpOnly — mas o login NÃO emite/renova credencial a partir de cookies
+    existentes, então não há o que o CSRF proteja aqui. A proteção de força
+    bruta fica no throttle (5/min). O /api/token/refresh/ CONTINUA exigindo
+    CSRF (duplo envio / dupla chave cross-origin): o cookie de refresh é
+    uma credencial que o navegador enviaria automaticamente.
     """
 
     serializer_class = TokenObtainPairEmailSerializer
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "login"
 
@@ -194,15 +204,14 @@ class TokenObtainPairThrottledView(TokenObtainPairView):
 class TokenObtainPairCookieView(TokenObtainPairThrottledView):
     """Login JWT: devolve SOLO o access token no body; o refresh token viaja
     num cookie httpOnly (Secure, SameSite=Strict), fora do alcance do
-    JavaScript. Protegido com CSRF (duplo envio).
+    JavaScript. SEM proteção CSRF (a credencial só é emitida a partir de
+    credenciais enviadas no corpo da request — ver TokenObtainPairThrottledView).
     """
 
     @method_decorator(ensure_csrf_cookie)
     def dispatch(self, request, *args, **kwargs):
         return super().dispatch(request, *args, **kwargs)
 
-    @csrf_fallback_cross_origin
-    @method_decorator(csrf_protect)
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         try:
