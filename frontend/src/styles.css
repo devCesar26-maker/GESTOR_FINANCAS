@@ -7,8 +7,8 @@
   /* Backgrounds */
   --bg-app: #f1f5f9;
   --bg-card: #ffffff;
-  --bg-sidebar: #1e2d4a;
-  --bg-sidebar-hover: #2d3f63;
+  --bg-sidebar: #172554;
+  --bg-sidebar-hover: #1e3a8a;
   --bg-sidebar-active: #2563eb;
   --bg-input: #f8fafc;
 
@@ -49,8 +49,8 @@
   --radius-lg: 12px;
 
   /* Shadows */
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
-  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.1);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.08);
   --shadow-sidebar: 2px 0 8px rgba(0,0,0,0.12);
 }
 
@@ -75,6 +75,7 @@ body {
 /* =========================================================
    App Shell — Sidebar Layout
    ========================================================= */
+.layout-container,
 .app-shell {
   display: flex;
   min-height: 100vh;
@@ -95,6 +96,7 @@ body {
   flex-shrink: 0;
 }
 
+.sidebar-header,
 .sidebar-brand {
   display: flex;
   align-items: center;
@@ -105,25 +107,35 @@ body {
   margin-bottom: 0.5rem;
 }
 
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+}
+
+.brand-icon,
 .sidebar-brand-icon {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   background: var(--accent-primary);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
+  font-weight: 800;
   font-size: 1.1rem;
   color: #fff;
   flex-shrink: 0;
 }
 
+.brand-name,
 .sidebar-brand-name {
-  font-size: 1.15rem;
-  font-weight: 700;
+  font-size: 1.2rem;
+  font-weight: 800;
   color: #fff;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .sidebar-brand-sub {
@@ -198,10 +210,11 @@ body {
   min-height: 100vh;
 }
 
+.content-container,
 .page-container {
   flex: 1;
   padding: 2rem 2.25rem;
-  max-width: 1280px;
+  max-width: 1400px;
   width: 100%;
 }
 
