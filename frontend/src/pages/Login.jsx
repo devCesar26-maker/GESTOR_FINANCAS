@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import api, { setAccessToken } from '../api/client'
 import BotaoGoogle from '../components/BotaoGoogle'
+import { FinFlowLogo } from '../components/FinFlowLogo'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -37,8 +38,7 @@ export default function Login() {
     <div className="auth-wrapper">
       <div className="auth-sidebar">
         <div className="auth-sidebar-logo">
-          <div className="brand-icon">F</div>
-          <span className="brand-name" style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 700 }}>FinFlow</span>
+          <FinFlowLogo />
         </div>
         <h1 className="auth-sidebar-title">Gestão financeira simples e inteligente</h1>
         <p className="auth-sidebar-desc">

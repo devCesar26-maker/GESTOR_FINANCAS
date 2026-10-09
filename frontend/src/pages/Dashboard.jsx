@@ -223,55 +223,63 @@ export default function Dashboard() {
       ) : data ? (
         <>
           <div className="stats-grid">
-            <div className="stat-card stat-card-receber">
-              <div className="stat-card-header">
-                <span className="stat-label">Total a Receber</span>
-                <div className="stat-icon icon-success">
-                  <IconTrendingUp />
-                </div>
-              </div>
-              <div className="stat-value positive">{formatCurrency(data.total_a_receber)}</div>
-            </div>
-
-            <div className="stat-card stat-card-pagar">
-              <div className="stat-card-header">
-                <span className="stat-label">Total a Pagar</span>
-                <div className="stat-icon icon-danger">
-                  <IconTrendingDown />
-                </div>
-              </div>
-              <div className="stat-value negative">{formatCurrency(data.total_a_pagar)}</div>
-            </div>
-
-            <div className="stat-card stat-card-recebido">
-              <div className="stat-card-header">
-                <span className="stat-label">Total Recebido</span>
-                <div className="stat-icon icon-success">
-                  <IconCheckCircle />
-                </div>
-              </div>
-              <div className="stat-value positive">{formatCurrency(data.total_recebido)}</div>
-            </div>
-
-            <div className="stat-card stat-card-pago">
-              <div className="stat-card-header">
-                <span className="stat-label">Total Pago</span>
-                <div className="stat-icon icon-danger">
-                  <IconCreditCard />
-                </div>
-              </div>
-              <div className="stat-value negative">{formatCurrency(data.total_pago)}</div>
-            </div>
-
-            <div className="stat-card stat-card-saldo">
-              <div className="stat-card-header">
-                <span className="stat-label">Saldo Realizado</span>
-                <div className="stat-icon icon-info">
+            <div className="stat-card">
+              <div className="stat-card-body">
+                <div className="stat-icon icon-blue">
                   <IconWallet />
                 </div>
+                <div className="stat-details">
+                  <span className="stat-label">Total a Receber</span>
+                  <div className="stat-value">{formatCurrency(data.total_a_receber)}</div>
+                </div>
               </div>
-              <div className={`stat-value ${Number(data.saldo_realizado) >= 0 ? 'positive' : 'negative'}`}>
-                {formatCurrency(data.saldo_realizado)}
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-card-body">
+                <div className="stat-icon icon-emerald">
+                  <IconCheckCircle />
+                </div>
+                <div className="stat-details">
+                  <span className="stat-label">Total a Pagar</span>
+                  <div className="stat-value">{formatCurrency(data.total_a_pagar)}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-card-body">
+                <div className="stat-icon icon-red">
+                  <IconCreditCard />
+                </div>
+                <div className="stat-details">
+                  <span className="stat-label">Total Recebido</span>
+                  <div className="stat-value">{formatCurrency(data.total_recebido)}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-card-body">
+                <div className="stat-icon icon-coral">
+                  <IconTrendingDown />
+                </div>
+                <div className="stat-details">
+                  <span className="stat-label">Total Pago</span>
+                  <div className="stat-value">{formatCurrency(data.total_pago)}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-card-body">
+                <div className="stat-icon icon-amber">
+                  <IconTrendingUp />
+                </div>
+                <div className="stat-details">
+                  <span className="stat-label">Saldo Realizado</span>
+                  <div className="stat-value">{formatCurrency(data.saldo_realizado)}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -295,8 +303,8 @@ export default function Dashboard() {
                     contentStyle={TOOLTIP_STYLE}
                   />
                   <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                  <Bar dataKey="Entradas" fill="#10b981" radius={[2, 2, 0, 0]} maxBarSize={55} />
-                  <Bar dataKey="Saídas" fill="#ef4444" radius={[2, 2, 0, 0]} maxBarSize={55} />
+                  <Bar dataKey="Entradas" fill="#152040" radius={[4, 4, 0, 0]} maxBarSize={55} />
+                  <Bar dataKey="Saídas" fill="#1fca8d" radius={[4, 4, 0, 0]} maxBarSize={55} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

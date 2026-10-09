@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import api, { clearAccessToken } from '../api/client'
 import ConfirmDialog from './ConfirmDialog'
+import { FinFlowLogo } from './FinFlowLogo'
 
 export default function Layout({ children }) {
   const navigate = useNavigate()
@@ -25,9 +26,8 @@ export default function Layout({ children }) {
     <div className="layout-container">
       <aside className="sidebar">
         <div className="sidebar-header">
-          <Link to="/" className="brand">
-            <div className="brand-icon">F</div>
-            <span className="brand-name">FinFlow</span>
+          <Link to="/" className="brand" style={{ textDecoration: 'none' }}>
+            <FinFlowLogo />
           </Link>
         </div>
 

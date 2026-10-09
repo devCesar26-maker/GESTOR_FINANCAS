@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api/client'
+import { FinFlowLogo } from '../components/FinFlowLogo'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -39,8 +40,7 @@ export default function EsqueceuSenha() {
     <div className="auth-wrapper">
       <div className="auth-sidebar">
         <div className="auth-sidebar-logo">
-          <div className="brand-icon">F</div>
-          <span className="brand-name" style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 700 }}>FinFlow</span>
+          <FinFlowLogo />
         </div>
         <h1 className="auth-sidebar-title">Recuperação de Acesso</h1>
         <p className="auth-sidebar-desc">
