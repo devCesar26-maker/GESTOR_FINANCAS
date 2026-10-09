@@ -5,7 +5,6 @@ import BotaoGoogle from '../components/BotaoGoogle'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-// Política de senha forte — deve espelhar SenhaForteValidator (backend).
 const REGRAS_SENHA = [
   { rotulo: 'Pelo menos 8 caracteres', ok: (s) => s.length >= 8 },
   { rotulo: 'Uma letra maiúscula (A–Z)', ok: (s) => /[A-Z]/.test(s) },
@@ -14,8 +13,6 @@ const REGRAS_SENHA = [
   { rotulo: 'Um caractere especial (ex: !@#$%)', ok: (s) => /[^A-Za-z0-9]/.test(s) },
 ]
 
-// Converte erros de campo do DRF ({ email: [...], password: [...] }) em
-// mensagens legíveis; cai para uma mensagem genérica quando não reconhece.
 function traduzirErroBackend(data) {
   if (!data) return 'Não foi possível criar a conta. Tente novamente.'
   if (typeof data === 'string') return data
@@ -39,8 +36,6 @@ export default function Registro() {
 
   const set = (campo) => (e) => setForm((f) => ({ ...f, [campo]: e.target.value }))
 
-  // Validação no frontend ANTES de enviar: campos obrigatórios, formato de
-  // e-mail, mínimo de caracteres e confirmação idêntica à senha.
   const validar = () => {
     const errs = {}
     if (!form.nome.trim()) errs.nome = 'Informe seu nome.'
@@ -70,7 +65,6 @@ export default function Registro() {
         email: form.email.trim().toLowerCase(),
         password: form.senha,
       })
-      // Cadastro bem-sucedido → volta para o login para entrar com as credenciais.
       navigate('/login', { state: { contaCriada: form.email.trim().toLowerCase() } })
     } catch (err) {
       setError(traduzirErroBackend(err.response?.data))
@@ -80,110 +74,128 @@ export default function Registro() {
   }
 
   return (
-    <div className="login-wrapper">
-      <div className="login-card">
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div className="brand-icon" style={{ margin: '0 auto 1rem auto', width: '48px', height: '48px', fontSize: '1.5rem' }}>
-            F
+    <div className="auth-wrapper">
+      <div className="auth-sidebar">
+        <div className="auth-sidebar-logo">
+          <div className="brand-icon">F</div>
+          <span className="brand-name" style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 700 }}>FinFlow</span>
+        </div>
+        <h1 className="auth-sidebar-title">Comece a gerenciar seu negócio hoje</h1>
+        <p className="auth-sidebar-desc">
+          Crie sua conta em menos de 1 minuto e tenha controle financeiro total da sua empresa.
+        </p>
+        <div className="auth-features" style={{ marginTop: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="auth-feature">
+            <div className="auth-feature-dot" />
+            <span>Sem necessidade de cartão de crédito</span>
           </div>
-          <h2>Criar conta no FinFlow</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-            Gestão Financeira para Pequenos Negócios
+          <div className="auth-feature">
+            <div className="auth-feature-dot" />
+            <span>Acesso completo ao painel financeiro</span>
+          </div>
+          <div className="auth-feature">
+            <div className="auth-feature-dot" />
+            <span>Integração simples com Google Login</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="auth-main">
+        <div className="auth-form-box">
+          <h2 className="auth-form-title">Criar conta no FinFlow</h2>
+          <p className="auth-form-sub">Preencha os dados abaixo para se cadastrar</p>
+
+          {error && <div className="alert-error">{error}</div>}
+
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="form-group">
+              <label className="form-label" htmlFor="reg-nome">Nome</label>
+              <input
+                id="reg-nome"
+                type="text"
+                className="form-input"
+                value={form.nome}
+                onChange={set('nome')}
+                placeholder="Seu nome completo"
+              />
+              {errors.nome && <small style={{ color: 'var(--accent-danger)' }}>{errors.nome}</small>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="reg-email">E-mail</label>
+              <input
+                id="reg-email"
+                type="email"
+                className="form-input"
+                value={form.email}
+                onChange={set('email')}
+                placeholder="voce@empresa.com.br"
+                autoComplete="email"
+              />
+              {errors.email && <small style={{ color: 'var(--accent-danger)' }}>{errors.email}</small>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="reg-senha">Senha</label>
+              <input
+                id="reg-senha"
+                type="password"
+                className="form-input"
+                value={form.senha}
+                onChange={set('senha')}
+                placeholder="Sua senha forte"
+                autoComplete="new-password"
+              />
+              {errors.senha && <small style={{ color: 'var(--accent-danger)' }}>{errors.senha}</small>}
+              <ul style={{ listStyle: 'none', padding: 0, margin: '0.5rem 0 0 0', fontSize: '0.8rem' }}>
+                {REGRAS_SENHA.map((regra) => {
+                  const satisfeita = regra.ok(form.senha)
+                  return (
+                    <li
+                      key={regra.rotulo}
+                      style={{
+                        color: satisfeita ? 'var(--accent-success)' : 'var(--text-muted)',
+                        marginBottom: '0.15rem',
+                      }}
+                    >
+                      {satisfeita ? '✓' : '○'} {regra.rotulo}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="reg-confirmacao">Confirmar senha</label>
+              <input
+                id="reg-confirmacao"
+                type="password"
+                className="form-input"
+                value={form.confirmacao}
+                onChange={set('confirmacao')}
+                placeholder="Repita a senha"
+                autoComplete="new-password"
+              />
+              {errors.confirmacao && <small style={{ color: 'var(--accent-danger)' }}>{errors.confirmacao}</small>}
+            </div>
+
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={loading}>
+              {loading ? 'Criando conta...' : 'Criar conta'}
+            </button>
+          </form>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '1.25rem 0' }}>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ou</span>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
+          </div>
+
+          <BotaoGoogle texto="Cadastrar com Google" />
+
+          <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+            Já tem uma conta? <Link to="/login" style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>Entrar</Link>
           </p>
         </div>
-
-        {error && <div className="alert-error">{error}</div>}
-
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="form-group">
-            <label className="form-label" htmlFor="reg-nome">Nome</label>
-            <input
-              id="reg-nome"
-              type="text"
-              className="form-input"
-              value={form.nome}
-              onChange={set('nome')}
-              placeholder="Seu nome completo"
-            />
-            {errors.nome && <small style={{ color: 'var(--accent-danger)' }}>{errors.nome}</small>}
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="reg-email">E-mail</label>
-            <input
-              id="reg-email"
-              type="email"
-              className="form-input"
-              value={form.email}
-              onChange={set('email')}
-              placeholder="voce@empresa.com.br"
-              autoComplete="email"
-            />
-            {errors.email && <small style={{ color: 'var(--accent-danger)' }}>{errors.email}</small>}
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="reg-senha">Senha</label>
-            <input
-              id="reg-senha"
-              type="password"
-              className="form-input"
-              value={form.senha}
-              onChange={set('senha')}
-              placeholder="Sua senha forte"
-              autoComplete="new-password"
-            />
-            {errors.senha && <small style={{ color: 'var(--accent-danger)' }}>{errors.senha}</small>}
-            <ul style={{ listStyle: 'none', padding: 0, margin: '0.5rem 0 0 0', fontSize: '0.8rem' }}>
-              {REGRAS_SENHA.map((regra) => {
-                const satisfeita = regra.ok(form.senha)
-                return (
-                  <li
-                    key={regra.rotulo}
-                    style={{
-                      color: satisfeita ? 'var(--accent-success, #34d399)' : 'var(--text-muted)',
-                      marginBottom: '0.15rem',
-                    }}
-                  >
-                    {satisfeita ? '✓' : '○'} {regra.rotulo}
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="reg-confirmacao">Confirmar senha</label>
-            <input
-              id="reg-confirmacao"
-              type="password"
-              className="form-input"
-              value={form.confirmacao}
-              onChange={set('confirmacao')}
-              placeholder="Repita a senha"
-              autoComplete="new-password"
-            />
-            {errors.confirmacao && <small style={{ color: 'var(--accent-danger)' }}>{errors.confirmacao}</small>}
-          </div>
-
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={loading}>
-            {loading ? 'Criando conta...' : 'Criar conta'}
-          </button>
-        </form>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '1rem 0' }}>
-          <div style={{ flex: 1, height: '1px', background: 'var(--border, #e5e7eb)' }} />
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ou</span>
-          <div style={{ flex: 1, height: '1px', background: 'var(--border, #e5e7eb)' }} />
-        </div>
-
-        {/* O cadastro com Google usa o MESMO endpoint do login: e-mail novo
-            cria a conta automaticamente no backend (ver /api/auth/google/). */}
-        <BotaoGoogle texto="Cadastrar com Google" />
-
-        <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-          Já tem uma conta? <Link to="/login" style={{ fontWeight: 600 }}>Entrar</Link>
-        </p>
       </div>
     </div>
   )

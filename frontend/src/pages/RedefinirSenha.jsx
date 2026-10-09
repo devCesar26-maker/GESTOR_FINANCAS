@@ -2,9 +2,6 @@ import { useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import api from '../api/client'
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-// Política de senha forte — deve espelhar SenhaForteValidator (backend).
 const REGRAS_SENHA = [
   { rotulo: 'Pelo menos 8 caracteres', ok: (s) => s.length >= 8 },
   { rotulo: 'Uma letra maiúscula (A–Z)', ok: (s) => /[A-Z]/.test(s) },
@@ -13,9 +10,6 @@ const REGRAS_SENHA = [
   { rotulo: 'Um caractere especial (ex: !@#$%)', ok: (s) => /[^A-Za-z0-9]/.test(s) },
 ]
 
-// Página pública alcançada pelo link do e-mail: /redefinir-senha/:uid/:token.
-// Envia uid+token+senha nova ao backend; os erros de token (400) são
-// traduzidos em orientação para solicitar um novo link.
 export default function RedefinirSenha() {
   const { uid, token } = useParams()
   const navigate = useNavigate()
@@ -52,8 +46,6 @@ export default function RedefinirSenha() {
         token,
         new_password: senha,
       })
-      // Sucesso: volta ao login com aviso amigável (mesmo mecanismo do
-      // "contaCriada" usado pelo Registro).
       navigate('/login', {
         state: { senhaRedefinida: true },
       })
@@ -70,85 +62,88 @@ export default function RedefinirSenha() {
   }
 
   return (
-    <div className="login-wrapper">
-      <div className="login-card">
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div
-            className="brand-icon"
-            style={{ margin: '0 auto 1rem auto', width: '48px', height: '48px', fontSize: '1.5rem' }}
-          >
-            F
-          </div>
-          <h2>Criar nova senha</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-            Gestão Financeira para Pequenos Negócios
+    <div className="auth-wrapper">
+      <div className="auth-sidebar">
+        <div className="auth-sidebar-logo">
+          <div className="brand-icon">F</div>
+          <span className="brand-name" style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 700 }}>FinFlow</span>
+        </div>
+        <h1 className="auth-sidebar-title">Segurança em Primeiro Lugar</h1>
+        <p className="auth-sidebar-desc">
+          Defina uma nova senha forte para manter sua conta e dados financeiros protegidos.
+        </p>
+      </div>
+
+      <div className="auth-main">
+        <div className="auth-form-box">
+          <h2 className="auth-form-title">Criar nova senha</h2>
+          <p className="auth-form-sub">Escolha uma nova senha para sua conta</p>
+
+          {error && <div className="alert-error">{error}</div>}
+
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="form-group">
+              <label className="form-label" htmlFor="nova-senha">Nova senha</label>
+              <input
+                id="nova-senha"
+                type="password"
+                className="form-input"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                placeholder="Sua nova senha forte"
+                autoComplete="new-password"
+              />
+              {errors.senha && <small style={{ color: 'var(--accent-danger)' }}>{errors.senha}</small>}
+              <ul style={{ listStyle: 'none', padding: 0, margin: '0.5rem 0 0 0', fontSize: '0.8rem' }}>
+                {REGRAS_SENHA.map((regra) => {
+                  const satisfeita = regra.ok(senha)
+                  return (
+                    <li
+                      key={regra.rotulo}
+                      style={{
+                        color: satisfeita ? 'var(--accent-success)' : 'var(--text-muted)',
+                        marginBottom: '0.15rem',
+                      }}
+                    >
+                      {satisfeita ? '✓' : '○'} {regra.rotulo}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="confirmar-nova-senha">Confirmar nova senha</label>
+              <input
+                id="confirmar-nova-senha"
+                type="password"
+                className="form-input"
+                value={confirmacao}
+                onChange={(e) => setConfirmacao(e.target.value)}
+                placeholder="Repita a nova senha"
+                autoComplete="new-password"
+              />
+              {errors.confirmacao && (
+                <small style={{ color: 'var(--accent-danger)' }}>{errors.confirmacao}</small>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={{ width: '100%', justifyContent: 'center' }}
+              disabled={loading}
+            >
+              {loading ? 'Redefinindo...' : 'Redefinir senha'}
+            </button>
+          </form>
+
+          <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+            <Link to="/esqueceu-senha" style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>Solicitar novo link</Link>
+            {' • '}
+            <Link to="/login" style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>Voltar ao login</Link>
           </p>
         </div>
-
-        {error && <div className="alert-error">{error}</div>}
-
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="form-group">
-            <label className="form-label" htmlFor="nova-senha">Nova senha</label>
-            <input
-              id="nova-senha"
-              type="password"
-              className="form-input"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              placeholder="Sua nova senha forte"
-              autoComplete="new-password"
-            />
-            {errors.senha && <small style={{ color: 'var(--accent-danger)' }}>{errors.senha}</small>}
-            <ul style={{ listStyle: 'none', padding: 0, margin: '0.5rem 0 0 0', fontSize: '0.8rem' }}>
-              {REGRAS_SENHA.map((regra) => {
-                const satisfeita = regra.ok(senha)
-                return (
-                  <li
-                    key={regra.rotulo}
-                    style={{
-                      color: satisfeita ? 'var(--accent-success, #34d399)' : 'var(--text-muted)',
-                      marginBottom: '0.15rem',
-                    }}
-                  >
-                    {satisfeita ? '✓' : '○'} {regra.rotulo}
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="confirmar-nova-senha">Confirmar nova senha</label>
-            <input
-              id="confirmar-nova-senha"
-              type="password"
-              className="form-input"
-              value={confirmacao}
-              onChange={(e) => setConfirmacao(e.target.value)}
-              placeholder="Repita a nova senha"
-              autoComplete="new-password"
-            />
-            {errors.confirmacao && (
-              <small style={{ color: 'var(--accent-danger)' }}>{errors.confirmacao}</small>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%', justifyContent: 'center' }}
-            disabled={loading}
-          >
-            {loading ? 'Redefinindo...' : 'Redefinir senha'}
-          </button>
-        </form>
-
-        <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-          <Link to="/esqueceu-senha" style={{ fontWeight: 600 }}>Solicitar novo link</Link>
-          {' • '}
-          <Link to="/login" style={{ fontWeight: 600 }}>Voltar ao login</Link>
-        </p>
       </div>
     </div>
   )

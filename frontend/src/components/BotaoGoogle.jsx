@@ -19,10 +19,16 @@ export default function BotaoGoogle({ texto = 'Entrar com Google' }) {
   if (!clientId) return null
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', margin: '1rem 0' }}>
+    <div className="google-btn-container" style={{ width: '100%', display: 'flex', justifyContent: 'center', margin: '0.5rem 0' }}>
       <GoogleLogin
         clientId={clientId}
         buttonText={texto}
+        text={texto.includes('Cadastrar') ? 'signup_with' : 'signin_with'}
+        theme="outline"
+        size="large"
+        shape="rectangular"
+        width="100%"
+        locale="pt_BR"
         // Popup (default): o id_token chega direto no callback, sem redirect.
         onSuccess={async (credentialResponse) => {
           try {
