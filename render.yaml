@@ -36,6 +36,13 @@ services:
         value: "8000"
       - key: DEBUG
         value: "false"
+      # CHIPS (Partitioned) no cookie refresh_token/csrftoken: o Chrome
+      # rejeita cookies cross-site sem Partitioned (SPA e API em
+      # subdomínios diferentes). Pré-condição (Secure + SameSite=None)
+      # já é o caso deste deploy (CSRF_COOKIE_SAMESITE/REFRESH_COOKIE_SAMESITE
+      # = None abaixo).
+      - key: REFRESH_COOKIE_PARTITIONED
+        value: "true"
       # Sobe o Celery (worker -P solo + beat) no MESMO container, via
       # entrypoint.sh — plano free = 1 web service só.
       - key: RUN_EMBEDDED_CELERY
@@ -179,17 +186,20 @@ services:
       - path: /*
         name: Strict-Transport-Security
         value: max-age=31536000; includeSubDomains; preload
-      # CSP com Google Identity Services liberado (botão "Entrar com Google"):
+      # CSP com nonce por requisição (substitui 'unsafe-inline' em
+      # script-src — achado OWASP ZAP): o header aqui NÃO precisa de nonce
+      # porque este static site serve APENAS assets estáticos (HTML gerado
+      # pelo Vite não executa scripts inline — a SPA carrega via
+      # <script type="module" src=...> com hash no nome). O nonce só é
+      # relevante nas respostas DINÂMICAS da API Django (ver
+      # finflow/middleware.py). Google Identity Services liberado:
       #   script-src  → loader https://accounts.google.com/gsi/client
       #   frame-src   → iframe do GIS em https://accounts.google.com/gsi/
       #   connect-src → XHRs do popup/One Tap para https://accounts.google.com/gsi/
       #   style-src   → folha de estilo https://accounts.google.com/gsi/style
-      # As demais diretivas (img-src Cloudinary, font-src Google Fonts,
-      # frame-ancestors) foram preservadas para não quebrar funcionalidades
-      # existentes nem reabrir brechas do hardening OWASP ZAP.
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; frame-src 'self' https://accounts.google.com/gsi/; connect-src 'self' https://*.onrender.com wss://*.onrender.com https://accounts.google.com/gsi/; img-src 'self' data: https://*.cloudinary.com https://*.onrender.com; font-src 'self' data: https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self';"
+        value: "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; frame-src 'self' https://accounts.google.com/gsi/; connect-src 'self' https://*.onrender.com wss://*.onrender.com https://accounts.google.com/gsi/; img-src 'self' data: https://*.cloudinary.com https://*.onrender.com; font-src 'self' data: https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self';"
       # Assets do Vite têm hash no nome: cache agressivo e seguro.
       - path: /assets/*
         name: Cache-Control

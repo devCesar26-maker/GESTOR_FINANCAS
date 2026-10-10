@@ -83,6 +83,9 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    # Anexa Partitioned (CHIPS) ao Set-Cookie de refresh_token/csrftoken
+    # quando aplicável (ver REFRESH_COOKIE_PARTITIONED acima).
+    "finflow.cookie_compat.PartitionedCookiesMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -102,6 +105,8 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                # Nonce CSP único por request (ver finflow.middleware).
+                "finflow.context_processors.csp",
             ],
         },
     },
@@ -563,7 +568,19 @@ SESSION_COOKIE_HTTPONLY = True
 
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline'; "
+    # NONCE por requisição (gerado no CSPFrameAncestorsMiddleware, atributo
+    # request.csp_nonce) em vez de 'unsafe-inline' em script-src
+    # (achado ZAP, risco médio). SEM 'strict-dynamic': com ele os browsers
+    # ignoram 'self' e o whitelist de hosts, quebrando o bundle da SPA
+    # (servida mesma-origem via whitenoise) e os estáticos do /admin/.
+    # O SDK do Google Identity Services (accounts.google.com/gsi/client)
+    # é carregado dinamicamente pela SPA e fica coberto pelo allow-list
+    # de host; scripts inline que eventualmente existam em templates de
+    # HTML próprio precisam levar nonce="{{ csp_nonce }}" (exposto pelo
+    # context processor finflow.context_processors.csp).
+    "script-src 'self' 'nonce-{{CSP_NONCE}}' "
+    "https://accounts.google.com/gsi/client "
+    "https://accounts.google.com https://apis.google.com; "
     "style-src 'self' 'unsafe-inline'; "
     "img-src 'self' data:; "
     "font-src 'self'; "
@@ -587,6 +604,13 @@ REFRESH_COOKIE_SECURE = env_bool("REFRESH_COOKIE_SECURE", default=not DEBUG)
 # (mesma origem via proxy do Vite). Django aceita "Lax", "Strict" ou "None".
 CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", "Lax")
 REFRESH_COOKIE_SAMESITE = os.getenv("REFRESH_COOKIE_SAMESITE", "Lax")
+# CHIPS (Partitioned): anexa o atributo Partitioned aos cookies
+# refresh_token/csrftoken quando são cookies cross-site (Secure +
+# SameSite=None — pré-condição da spec). O Chrome rejeita cookies
+# terceiros sem Partitioned; em dev (Lax) o atributo NÃO é anexado
+# (inválido naquele contexto) e em produção cross-origin (Render,
+# SameSite=None via env) entra automaticamente.
+REFRESH_COOKIE_PARTITIONED = env_bool("REFRESH_COOKIE_PARTITIONED", default=not DEBUG)
 
 # Por trás de proxy que termina TLS (Render, Nginx da borda, etc.) o Django
 # recebe HTTP puro: sem este header ele NÃO sabe que o cliente veio por

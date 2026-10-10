@@ -13,6 +13,8 @@ from django.utils.crypto import constant_time_compare
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+
+from finflow.cookie_compat import _adicionar_partitioned
 from django.views.decorators.csrf import (
     csrf_protect,
     ensure_csrf_cookie,
@@ -62,6 +64,12 @@ def _set_refresh_cookie(response, refresh_token):
         # Em dev (mesma origem via proxy Vite) o padrão é Lax (ver settings).
         samesite=settings.REFRESH_COOKIE_SAMESITE,
     )
+    # CHIPS (Partitioned): o Chrome passa a rejeitar cookies cross-site sem
+    # Partitioned — sem ele, o cookie httpOnly do refresh token seria
+    # descartado no deploy cross-origin (SPA/API em subdomínios distintos)
+    # e o refresh automático quebraria. O helper anexa o atributo diretamente
+    # no SimpleCookie porque o set_cookie() do Django (5.2) não o suporta.
+    _adicionar_partitioned(response, REFRESH_COOKIE_NAME)
 
 
 # ---------------------------------------------------------------------------

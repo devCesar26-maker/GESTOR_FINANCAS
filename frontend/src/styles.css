@@ -233,6 +233,21 @@ body {
   border-color: rgba(255, 255, 255, 0.5);
 }
 
+/* ---- Topbar mobile (hambúrguer) — escondido em desktop ---- */
+.topbar-mobile {
+  display: none;
+}
+
+/* ---- Overlay do drawer ---- */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  /* ABAIXO da sidebar (z-100): o overlay cobre o conteúdo e fecha o
+     drawer no toque, mas não bloqueia a sidebar em si. */
+  z-index: 90;
+}
+
 /* ---- Main content ---- */
 .main-content {
   margin-left: var(--sidebar-width);
@@ -782,25 +797,101 @@ body {
 @media (max-width: 768px) {
   :root { --sidebar-width: 0px; }
 
+  /* Topbar + conteúdo empilham verticalmente (sidebar é position:fixed). */
+  .layout-container {
+    flex-direction: column;
+  }
+
   .sidebar {
     transform: translateX(-100%);
     width: 240px;
+    transition: transform 0.25s ease;
+  }
+
+  /* Drawer aberto: sidebar desliza sobre o conteúdo. */
+  .sidebar.sidebar-aberta {
+    transform: translateX(0);
+  }
+
+  .topbar-mobile {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--bg-sidebar);
+    padding: 0.75rem 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 120;
+  }
+
+  .topbar-mobile .btn-hamburguer {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
   }
 
   .main-content {
     margin-left: 0;
   }
 
-  .page-container {
-    padding: 1.25rem 1rem;
+  .topbar-mobile .topbar-marca {
+    color: #fff;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-size: 1rem;
+  }
+
+  /* Painel escuro do Login/Registro: empilhado acima do formulário.
+     Mantém logo + título curto; bullets de recursos ficam ocultos. */
+  .auth-wrapper {
+    flex-direction: column;
   }
 
   .auth-sidebar {
-    display: none;
+    display: block;
+    width: 100%;
+    padding: 1.5rem 1.25rem;
+    justify-content: flex-start;
+  }
+
+  .auth-sidebar-logo {
+    margin-bottom: 0.75rem;
+  }
+
+  .auth-sidebar-title {
+    font-size: 1.35rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .auth-sidebar-desc {
+    font-size: 0.8125rem;
+    line-height: 1.4;
+  }
+
+  .auth-features {
+    display: none !important;
   }
 
   .auth-main {
     padding: 1.5rem 1rem;
+    align-items: flex-start;
+    flex: 1;
+  }
+
+  .auth-form-box {
+    max-width: none;
+  }
+
+  .page-container {
+    padding: 1.25rem 1rem;
   }
 
   .page-header {
