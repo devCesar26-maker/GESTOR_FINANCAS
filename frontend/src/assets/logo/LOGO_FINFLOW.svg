@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Logo Studio - Textless Vector Mark -->
+
+<svg
+   version="1.1"
+   id="svg470"
+   sodipodi:docname="LOGO_FINFLOW.svg"
+   inkscape:version="1.2.2 (c497a0e, 2023-04-06, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><sodipodi:namedview
+   id="namedview472"
+   pagecolor="#ffffff"
+   bordercolor="#000000"
+   borderopacity="0.25"
+   inkscape:showpageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="0"
+   inkscape:deskcolor="#d1d1d1"
+   showgrid="false"
+   inkscape:zoom="2.2616667"
+   inkscape:cx="52.837141"
+   inkscape:cy="103.46352"
+   inkscape:window-width="1920"
+   inkscape:window-height="1115"
+   inkscape:window-x="0"
+   inkscape:window-y="0"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="svg470" />
+<defs
+   id="defs462">
+  <linearGradient
+     id="fintech-brand-gradient"
+     x1="85%"
+     y1="85%"
+     x2="15%"
+     y2="15%">
+    <stop
+       offset="0%"
+       stop-color="#06b6d4"
+       id="stop457" />
+    <stop
+       offset="100%"
+       stop-color="#3b82f6"
+       id="stop459" />
+  </linearGradient>
+  <linearGradient
+     inkscape:collect="always"
+     xlink:href="#fintech-brand-gradient"
+     id="linearGradient474"
+     x1="236.84976"
+     y1="66.739103"
+     x2="217.7563"
+     y2="47.645648"
+     gradientTransform="scale(0.43994135,2.2730303)"
+     gradientUnits="userSpaceOnUse" />
+  <linearGradient
+     inkscape:collect="always"
+     xlink:href="#fintech-brand-gradient"
+     id="linearGradient476"
+     x1="115.2646"
+     y1="125.29432"
+     x2="69.899418"
+     y2="79.929136"
+     gradientTransform="matrix(0.81878729,-0.00479507,5.5370085e-4,0.62256473,62.190324,6.4456394)"
+     gradientUnits="userSpaceOnUse" />
+  <linearGradient
+     inkscape:collect="always"
+     xlink:href="#fintech-brand-gradient"
+     id="linearGradient529"
+     x1="170.5471"
+     y1="150.70385"
+     x2="55.193602"
+     y2="35.350347"
+     gradientTransform="matrix(0.52735603,0.00713807,5.7852122e-4,0.69638661,78.507458,10.344383)"
+     gradientUnits="userSpaceOnUse" />
+</defs>
+ xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 200 200&quot; class=&quot;w-full h-full drop-shadow-lg&quot;&gt;
+    <path
+   d="m 138.04056,23.48965 38.70523,19.033061 0.0282,33.93386 c 0.0205,24.679159 -17.82098,42.946849 -38.6463,51.919529 -20.84068,-9.53667 -38.712914,-28.28774 -38.733415,-52.966909 l -0.02819,-33.93386 z"
+   fill="none"
+   stroke="url(#fintech-brand-gradient)"
+   stroke-width="9.69601"
+   stroke-linejoin="round"
+   id="path464"
+   style="stroke:url(#linearGradient529)" />
+<path
+   d="M 111.53831,90.212938 138.03417,49.71074 164.60178,89.902174 138.05809,76.608627 Z"
+   fill="url(#fintech-brand-gradient)"
+   id="path466"
+   style="fill:url(#linearGradient476);stroke-width:0.713968"
+   inkscape:transform-center-x="8.9028554"
+   inkscape:transform-center-y="4.752536" />
+<line
+   x1="138.09921"
+   y1="87.911079"
+   x2="138.04089"
+   y2="114.61999"
+   stroke="url(#fintech-brand-gradient)"
+   stroke-width="8.14391"
+   stroke-linecap="round"
+   id="line468"
+   style="stroke:url(#linearGradient474)" />
+</svg>

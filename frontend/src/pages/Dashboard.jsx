@@ -226,7 +226,7 @@ export default function Dashboard() {
             <div className="stat-card">
               <div className="stat-card-body">
                 <div className="stat-icon icon-blue">
-                  <IconWallet />
+                  <IconTrendingUp />
                 </div>
                 <div className="stat-details">
                   <span className="stat-label">Total a Receber</span>
@@ -237,8 +237,8 @@ export default function Dashboard() {
 
             <div className="stat-card">
               <div className="stat-card-body">
-                <div className="stat-icon icon-emerald">
-                  <IconCheckCircle />
+                <div className="stat-icon icon-amber">
+                  <IconTrendingDown />
                 </div>
                 <div className="stat-details">
                   <span className="stat-label">Total a Pagar</span>
@@ -249,8 +249,8 @@ export default function Dashboard() {
 
             <div className="stat-card">
               <div className="stat-card-body">
-                <div className="stat-icon icon-red">
-                  <IconCreditCard />
+                <div className="stat-icon icon-emerald">
+                  <IconCheckCircle />
                 </div>
                 <div className="stat-details">
                   <span className="stat-label">Total Recebido</span>
@@ -261,8 +261,8 @@ export default function Dashboard() {
 
             <div className="stat-card">
               <div className="stat-card-body">
-                <div className="stat-icon icon-coral">
-                  <IconTrendingDown />
+                <div className="stat-icon icon-blue">
+                  <IconCreditCard />
                 </div>
                 <div className="stat-details">
                   <span className="stat-label">Total Pago</span>
@@ -273,12 +273,14 @@ export default function Dashboard() {
 
             <div className="stat-card">
               <div className="stat-card-body">
-                <div className="stat-icon icon-amber">
-                  <IconTrendingUp />
+                <div className={`stat-icon ${Number(data.saldo_realizado) >= 0 ? 'icon-emerald' : 'icon-red'}`}>
+                  <IconWallet />
                 </div>
                 <div className="stat-details">
                   <span className="stat-label">Saldo Realizado</span>
-                  <div className="stat-value">{formatCurrency(data.saldo_realizado)}</div>
+                  <div className={`stat-value ${Number(data.saldo_realizado) >= 0 ? 'positive' : 'negative'}`}>
+                    {formatCurrency(data.saldo_realizado)}
+                  </div>
                 </div>
               </div>
             </div>
