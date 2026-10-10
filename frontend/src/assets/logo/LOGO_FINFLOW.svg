@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!-- Logo Studio - Textless Vector Mark -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<!-- viewBox apertado ao redor do escudo (centro ~138,76): sem o respiro
+     transparente do canvas 200x200 original, o ícone renderiza no tamanho
+     real do traço em vez de aparecer "pequeno demais" numa caixa vazia. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="78 16 120 120">
   <defs>
     <linearGradient id="fintech-brand-gradient" x1="85%" y1="85%" x2="15%" y2="15%">
       <stop offset="0%" stop-color="#06b6d4" />
