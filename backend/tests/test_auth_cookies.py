@@ -100,7 +100,7 @@ def test_refresh_con_cookie_invalido_devuelve_401(api_client, usuario):
 
 
 # ---------------------------------------------------------------------------
-# CSRF obrigatório NO REFRESH (cookie de credencial); login NÃO exige CSRF
+# CSRF isentado NO REFRESH (cookie de credencial é a própria defesa); login idem
 # ---------------------------------------------------------------------------
 
 
@@ -121,16 +121,18 @@ def test_login_sem_csrf_nao_da_403(api_client, usuario):
 
 
 @pytest.mark.django_db
-def test_refresh_sin_csrf_devuelve_403(csrf_client, usuario):
-    """Refresh sem X-CSRFToken → 403, com enforcement real de CSRF.
+def test_refresh_sem_csrf_ainda_funciona_com_cookie(csrf_client, usuario):
+    """Refresh SEM X-CSRFToken funciona com cookie válido (200).
 
-    O refresh usa um cookie de credencial (httpOnly) que o navegador
-    enviaria sozinho — por isso o CSRF segue obrigatório AQUI (apenas o
-    login ficou isento; ver TokenObtainPairThrottledView).
+    O refresh foi isentado de CSRF (deploy cross-origin Render): o cookie
+    httpOnly com path restrito é a defesa própria da rota. Aqui garantimos
+    que o refresh sem header X-CSRFToken CONTINUA devolvendo um novo access
+    token (não 403 CSRF).
     """
     _login(csrf_client)  # deja o cookie de refresh no client
     response = csrf_client.post(REFRESH_URL, {}, format="json")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_200_OK
+    assert "access" in response.data
 
 
 # ---------------------------------------------------------------------------

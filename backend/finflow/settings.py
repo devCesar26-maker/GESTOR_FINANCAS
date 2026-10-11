@@ -600,10 +600,10 @@ REFRESH_COOKIE_SECURE = env_bool("REFRESH_COOKIE_SECURE", default=not DEBUG)
 # SameSite dos cookies de sessão: no deploy Render a SPA e a API ficam em
 # subdomínios DIFERENTES (contexto cross-site) — csrftoken e refresh_token
 # só são guardados/enviados no XHR com SameSite=None (exige Secure, garantido
-# acima quando DEBUG=false). O padrão "Lax" preserva dev/docker-compose
-# (mesma origem via proxy do Vite). Django aceita "Lax", "Strict" ou "None".
-CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", "Lax")
-REFRESH_COOKIE_SAMESITE = os.getenv("REFRESH_COOKIE_SAMESITE", "Lax")
+# acima quando DEBUG=false). Em DEBUG o padrão é "Lax" (mesma origem via
+# proxy do Vite, cookie Secure=false). Django aceita "Lax", "Strict" ou "None".
+CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", "None" if not DEBUG else "Lax")
+REFRESH_COOKIE_SAMESITE = os.getenv("REFRESH_COOKIE_SAMESITE", "None" if not DEBUG else "Lax")
 # CHIPS (Partitioned): anexa o atributo Partitioned aos cookies
 # refresh_token/csrftoken quando são cookies cross-site (Secure +
 # SameSite=None — pré-condição da spec). O Chrome rejeita cookies
@@ -617,8 +617,11 @@ REFRESH_COOKIE_PARTITIONED = env_bool("REFRESH_COOKIE_PARTITIONED", default=not 
 # HTTPS e o SECURE_SSL_REDIRECT vira um loop infinito de 301 — o deploy
 # nunca passa no health check. Confie no header X-Forwarded-Proto APENAS
 # quando a variável TRUST_PROXY=1 estiver definida (nunca com o Django
-# exposto direto na internet).
-TRUST_PROXY = env_bool("TRUST_PROXY", default=False)
+# exposto direto na internet). EM PRODUÇÃO (DEBUG=False) o padrão agora é
+# CONFIAR no proxy: todo deploy do FinFlow vive atrás de proxy TLS (Render
+# ou Nginx); rodar Django exposto direto na internet é exceção — nesse
+# caso, defina TRUST_PROXY=0 explicitamente.
+TRUST_PROXY = env_bool("TRUST_PROXY", default=not DEBUG)
 if TRUST_PROXY:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     # Com X-Forwarded-Proto confiável, um request http simples não significa

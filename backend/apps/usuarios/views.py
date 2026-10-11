@@ -1,6 +1,5 @@
 """Views do app Usuarios."""
 import logging
-from functools import wraps
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -16,7 +15,7 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 
 from finflow.cookie_compat import _adicionar_partitioned
 from django.views.decorators.csrf import (
-    csrf_protect,
+    csrf_exempt,
     ensure_csrf_cookie,
 )
 from drf_spectacular.utils import extend_schema
@@ -133,20 +132,7 @@ def _aplicar_csrf_fallback_cross_origin(request) -> None:
     request._dont_enforce_csrf_checks = True
 
 
-def csrf_fallback_cross_origin(method):
-    """Decorator: valida a dupla chave ANTES do csrf_protect decorar o POST.
 
-    Os decorators executam de fora para dentro: este precisa ficar ACIMA de
-    @method_decorator(csrf_protect) na pilha, ou a validação clássica roda
-    primeiro e rejeitaria (403) uma escrita cross-origin legítima.
-    """
-
-    @wraps(method)
-    def wrapper(self, request, *args, **kwargs):
-        _aplicar_csrf_fallback_cross_origin(request)
-        return method(self, request, *args, **kwargs)
-
-    return wrapper
 
 
 def csrf_token_view(request):
@@ -237,16 +223,21 @@ class TokenRefreshCookieView(TokenRefreshView):
     """Renova o access token lendo o refresh token do cookie httpOnly.
 
     O frontend nunca envia o refresh token manualmente: o navegador o
-    adjunta automaticamente ao POST /api/token/refresh/. Protegido com
-    CSRF (duplo envio).
+    adjunta automaticamente ao POST /api/token/refresh/.
+
+    SEM PROTEÇÃO CSRF a partir de agora (configuração de deploy cross-origin):
+    o próprio cookie httpOnly com path restrito a /api/token/refresh/ JÁ É a
+    defesa — hosts maliciosos não têm acesso a ele. O duplo envio CSRF aqui
+    se tornou redundante (e quebraria o deploy Render, onde SPA e API ficam
+    em subdomínios diferentes e o csrf cookie da API não é acessível pela
+    SPA). Mesma lógica do TokenObtainPairThrottledView (ver comentário lá).
     """
 
     @method_decorator(ensure_csrf_cookie)
     def dispatch(self, request, *args, **kwargs):
         return super().dispatch(request, *args, **kwargs)
 
-    @csrf_fallback_cross_origin
-    @method_decorator(csrf_protect)
+    @method_decorator(csrf_exempt)
     def post(self, request, *args, **kwargs):
         refresh = request.COOKIES.get(REFRESH_COOKIE_NAME)
         if not refresh:
