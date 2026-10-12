@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import api, { clearAccessToken } from '../api/client'
+import api from '../api/client'
+import { useAuth } from '../auth/AuthContext'
 import ConfirmDialog from './ConfirmDialog'
 import { FinFlowLogo } from './FinFlowLogo'
 
 export default function Layout({ children }) {
   const navigate = useNavigate()
+  const { logout } = useAuth()
   const [confirmandoSaida, setConfirmandoSaida] = useState(false)
   const [saindo, setSaindo] = useState(false)
   const [menuAberto, setMenuAberto] = useState(false)
@@ -32,7 +34,7 @@ export default function Layout({ children }) {
     } catch {
       /* noop */
     }
-    clearAccessToken()
+    logout()
     setConfirmandoSaida(false)
     setSaindo(false)
     navigate('/login')

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { GoogleOAuthProvider, useGoogleOAuth } from '@react-oauth/google'
 import { loginComGoogle } from '../api/client'
+import { useAuth } from '../auth/AuthContext'
 
 // Botão "Entrar com Google" (Google Identity Services via @react-oauth/google).
 //
@@ -30,6 +31,7 @@ export default function BotaoGoogle({ texto = 'Entrar com Google' }) {
 
 function BotaoGoogleInterno({ texto }) {
   const navigate = useNavigate()
+  const { login: loginComAccess } = useAuth()
   const { clientId, scriptLoadedSuccessfully } = useGoogleOAuth()
   const containerRef = useRef(null)
   const inicializadoRef = useRef(false)
@@ -45,7 +47,8 @@ function BotaoGoogleInterno({ texto }) {
       return
     }
     try {
-      await loginComGoogle(credentialResponse.credential)
+      const { access } = await loginComGoogle(credentialResponse.credential)
+      loginComAccess(access)
       navigate('/')
     } catch (err) {
       console.error(err)

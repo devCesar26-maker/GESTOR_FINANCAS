@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
+import { AuthProvider } from './auth/AuthContext'
 import './styles.css'
 
 // Client ID do Google OAuth (Google Cloud Console → Credenciais). É variável
@@ -16,7 +17,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         normalmente, apenas sem o botão "Entrar com Google" (
         BotaoGoogle.jsx lê o clientId do GoogleOAuthContext e retorna null). */}
     <BrowserRouter>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>,
 )

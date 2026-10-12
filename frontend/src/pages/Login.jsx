@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import api, { setAccessToken } from '../api/client'
+import api from '../api/client'
+import { useAuth } from '../auth/AuthContext'
 import BotaoGoogle from '../components/BotaoGoogle'
 import { FinFlowLogo } from '../components/FinFlowLogo'
 
 export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { login: loginComAccess } = useAuth()
 
   const contaCriada = location.state?.contaCriada
   const senhaRedefinida = location.state?.senhaRedefinida
@@ -24,7 +26,7 @@ export default function Login() {
 
     try {
       const response = await api.post('/token/', { username, password })
-      setAccessToken(response.data.access)
+      loginComAccess(response.data.access)
       navigate('/')
     } catch (err) {
       console.error(err)
