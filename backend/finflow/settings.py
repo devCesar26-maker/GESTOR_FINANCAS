@@ -82,10 +82,14 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
-    # Anexa Partitioned (CHIPS) ao Set-Cookie de refresh_token/csrftoken
-    # quando aplicável (ver REFRESH_COOKIE_PARTITIONED acima).
+    # Anexa Partitioned (CHIPS) ao Set-Cookie de refresh_token/csrftoken.
+    # PRECISA estar ANTES do CsrfViewMiddleware: na fase de resposta o
+    # process_response roda em ordem REVERSA (de baixo para cima na lista),
+    # então este middleware executa DEPOIS do CSRF — quando o csrftoken já
+    # foi escrito em response.cookies. Abaixo dele, rodaria ANTES e o
+    # csrftoken sairia sem Partitioned (ver finflow.cookie_compat).
     "finflow.cookie_compat.PartitionedCookiesMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",

@@ -273,7 +273,17 @@ class LogoutView(APIView):
 
     def post(self, request):
         response = Response(status=status.HTTP_204_NO_CONTENT)
-        response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
+        # Atributos idênticos ao set_cookie do login (Secure + SameSite):
+        # o navegador só apaga o cookie particionado (CHIPS) se o Set-Cookie
+        # de exclusão casar nome/path E os atributos Secure/SameSite —
+        # senão o logout falharia silenciosamente em cookies Partitioned.
+        # O Partitioned em si é anexado pelo PartitionedCookiesMiddleware
+        # (o helper só age em Secure+SameSite=None; em dev, Lax, é omitido).
+        response.delete_cookie(
+            REFRESH_COOKIE_NAME,
+            path=REFRESH_COOKIE_PATH,
+            samesite=settings.REFRESH_COOKIE_SAMESITE,
+        )
         return response
 
 

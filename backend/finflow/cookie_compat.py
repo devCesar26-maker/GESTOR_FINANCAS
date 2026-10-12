@@ -54,15 +54,30 @@ def _adicionar_partitioned(response, cookie_name):
     morsel["partitioned"] = True
 
 
+def _anexar_partitioned_em_todos(response):
+    """Anexa Partitioned aos cookies alvo presentes na resposta.
+
+    Idempotente e tolerante a ausências: só age sobre os cookies que a
+    resposta de fato define (ex.: logout define APENAS o Set-Cookie de
+    exclusão do refresh_token; a resposta de refresh seta só o csrftoken
+    quando o token precisa rodar).
+    """
+    for nome in _COOKIES_PARTITIONED:
+        _adicionar_partitioned(response, nome)
+
+
 class PartitionedCookiesMiddleware:
     """Anexa Partitioned aos cookies refresh_token e csrftoken na resposta.
 
-    O refresh_token também recebe o atributo direto em
-    apps.usuarios.views._set_refresh_cookie (chamando _adicionar_partitioned).
-    O csrftoken é escrito pelo CsrfViewMiddleware com set_cookie() nativo,
-    então este middleware reescreve o Set-Cookie da resposta após o CSRF
-    terminar (process_response do middleware CSRF roda antes do nosso
-    porque o CsrfViewMiddleware está ANTES na lista MIDDLEWARE).
+    IMPORTANTE (ordem de middleware): process_response executa em ordem
+    REVERSA — de baixo para cima na lista MIDDLEWARE. Como na settings.py
+    este middleware fica ANTES (acima) do CsrfViewMiddleware, na fase de
+    resposta ele roda DEPOIS — quando o csrftoken (escrito pelo
+    set_cookie() nativo do CSRF middleware) já está em response.cookies.
+    Errar essa ordem era o motivo de csrftoken sair sem Partitioned: com o
+    middleware abaixo do de CSRF, ele rodava ANTES na resposta e o cookie
+    ainda não existia (o refresh_token não sofria porque a view usa
+    _set_refresh_cookie, chamando o helper direto).
 
     Habilitado por REFRESH_COOKIE_PARTITIONED; desligado em dev (DEBUG,
     cookie Lax — atributo seria inválido naquele contexto).
@@ -74,6 +89,5 @@ class PartitionedCookiesMiddleware:
     def __call__(self, request):
         response = self.get_response(request)
         if getattr(settings, "REFRESH_COOKIE_PARTITIONED", False):
-            for nome in _COOKIES_PARTITIONED:
-                _adicionar_partitioned(response, nome)
+            _anexar_partitioned_em_todos(response)
         return response
