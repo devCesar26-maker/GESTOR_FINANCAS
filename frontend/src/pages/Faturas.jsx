@@ -397,58 +397,77 @@ export default function Faturas() {
 
       {/* ------------------------------------------------ Filtros avançados */}
       <div className="card-table" style={{ padding: '1rem', marginBottom: '1rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem' }}>
-          <select
-            className="form-select"
-            value={filtros.status}
-            onChange={(e) => aplicarFiltros({ status: e.target.value })}
-            aria-label="Filtrar por status"
-          >
-            <option value="">Status: todos</option>
-            <option value="pendente">Pendente</option>
-            <option value="paga">Paga</option>
-            <option value="vencida">Vencida</option>
-            <option value="cancelada">Cancelada</option>
-          </select>
+        {/* Cada filtro em wrapper próprio com label (form-label) — os campos
+            de data só mostravam "dd/mm/aaaa" sem indicar qual era início
+            ou fim. Em telas estreitas o grid auto-fit quebra em várias
+            linhas sem espremer os campos. */}
+        <div className="filtros-grid">
+          <div>
+            <label className="form-label" htmlFor="filtro-status">Status</label>
+            <select
+              id="filtro-status"
+              className="form-select"
+              value={filtros.status}
+              onChange={(e) => aplicarFiltros({ status: e.target.value })}
+            >
+              <option value="">Todos</option>
+              <option value="pendente">Pendente</option>
+              <option value="paga">Paga</option>
+              <option value="vencida">Vencida</option>
+              <option value="cancelada">Cancelada</option>
+            </select>
+          </div>
 
-          <select
-            className="form-select"
-            value={filtros.tipo}
-            onChange={(e) => aplicarFiltros({ tipo: e.target.value })}
-            aria-label="Filtrar por tipo"
-          >
-            <option value="">Tipo: todos</option>
-            <option value="a_receber">Receber</option>
-            <option value="a_pagar">Pagar</option>
-          </select>
+          <div>
+            <label className="form-label" htmlFor="filtro-tipo">Tipo</label>
+            <select
+              id="filtro-tipo"
+              className="form-select"
+              value={filtros.tipo}
+              onChange={(e) => aplicarFiltros({ tipo: e.target.value })}
+            >
+              <option value="">Todos</option>
+              <option value="a_receber">Receber</option>
+              <option value="a_pagar">Pagar</option>
+            </select>
+          </div>
 
-          <input
-            type="date"
-            className="form-input"
-            value={filtros.vencimento_apos}
-            onChange={(e) => aplicarFiltros({ vencimento_apos: e.target.value })}
-            aria-label="Vencimento a partir de"
-            title="Vencimento a partir de"
-          />
-          <input
-            type="date"
-            className="form-input"
-            value={filtros.vencimento_ate}
-            onChange={(e) => aplicarFiltros({ vencimento_ate: e.target.value })}
-            aria-label="Vencimento até"
-            title="Vencimento até"
-          />
-          <input
-            type="search"
-            className="form-input"
-            placeholder="Buscar número/descrição..."
-            value={filtros.busca}
-            onChange={(e) => aplicarFiltros({ busca: e.target.value })}
-            aria-label="Buscar faturas"
-          />
-          <button className="btn btn-logout" onClick={limparFiltros}>
-            Limpar filtros
-          </button>
+          <div>
+            <label className="form-label" htmlFor="filtro-data-inicial">Data inicial</label>
+            <input
+              id="filtro-data-inicial"
+              type="date"
+              className="form-input"
+              value={filtros.vencimento_apos}
+              onChange={(e) => aplicarFiltros({ vencimento_apos: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="form-label" htmlFor="filtro-data-final">Data final</label>
+            <input
+              id="filtro-data-final"
+              type="date"
+              className="form-input"
+              value={filtros.vencimento_ate}
+              onChange={(e) => aplicarFiltros({ vencimento_ate: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="form-label" htmlFor="filtro-busca">Busca</label>
+            <input
+              id="filtro-busca"
+              type="search"
+              className="form-input"
+              placeholder="Número/descrição..."
+              value={filtros.busca}
+              onChange={(e) => aplicarFiltros({ busca: e.target.value })}
+            />
+          </div>
+          <div className="filtros-acao">
+            <button className="btn btn-logout" onClick={limparFiltros}>
+              Limpar filtros
+            </button>
+          </div>
         </div>
       </div>
 

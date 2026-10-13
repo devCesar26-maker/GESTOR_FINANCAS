@@ -296,7 +296,16 @@ export default function Dashboard() {
 
             <div style={{ width: '100%', height: 320 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 10 }}>
+                {/* Respiro visual entre os grupos: barCategoryGap abre espaço
+                    entre "Previsto" e "Realizado" (40% da largura de cada
+                    categoria); barGap separa as barras "Entradas"/"Saídas"
+                    de dentro do MESMO grupo. */}
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
+                  barCategoryGap="40%"
+                  barGap={8}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.07)" vertical={false} />
                   <XAxis dataKey="name" stroke="#94a3b8" tickLine={false} axisLine={{ stroke: '#334155' }} />
                   <YAxis stroke="#94a3b8" tickLine={false} axisLine={{ stroke: '#334155' }} />

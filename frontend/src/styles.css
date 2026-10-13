@@ -255,6 +255,10 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  /* min-width:0 — dentro de um container flex o item filho não encolhe
+     abaixo do conteúdo intrínseco (tabelas/gráficos largos); sem isso o
+     conteúdo empurra a página e causa scroll horizontal da página INTEIRA. */
+  min-width: 0;
 }
 
 .content-container,
@@ -263,6 +267,7 @@ body {
   padding: 2rem 2.25rem;
   max-width: 1400px;
   width: 100%;
+  min-width: 0;
 }
 
 /* =========================================================
@@ -408,6 +413,32 @@ body {
   box-shadow: var(--shadow-card);
   padding: 1.5rem;
   margin-bottom: 1.25rem;
+  min-width: 0;
+}
+
+/* =========================================================
+   Filtros com label (Faturas e afins)
+   ========================================================= */
+.filtros-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.filtros-grid .form-label {
+  font-size: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.filtros-acao {
+  display: flex;
+  align-items: flex-end;
+}
+
+.filtros-acao .btn {
+  width: auto;
+  white-space: nowrap;
 }
 
 /* =========================================================
@@ -416,6 +447,27 @@ body {
 .table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Sinalização do scroll horizontal contido: barra visível só quando há
+   transbordo, com trilha clara. Em larguras estreitas o CSS transforma
+   as linhas em cards e o scroll nem aparece. */
+.table-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.table-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.table-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
 }
 
 .data-table {
@@ -890,8 +942,23 @@ body {
     max-width: none;
   }
 
-  .page-container {
+  .page-container,
+  .content-container {
     padding: 1.25rem 1rem;
+  }
+
+  /* Cards de gráfico e filtros mais compactos em telas estreitas. */
+  .chart-card-container {
+    padding: 1rem;
+  }
+
+  .filtros-grid {
+    /* 375px: duas colunas (os campos nunca espremem abaixo do mínimo). */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filtros-acao {
+    justify-content: flex-end;
   }
 
   .page-header {
@@ -899,8 +966,33 @@ body {
     align-items: flex-start;
   }
 
+  /* KPI cards: 2 colunas; minmax(0,1fr) OBRIGA o card a encolher (sem
+     min-width:auto, o conteúdo intrínseco empurra o card além da coluna
+     e causa scroll horizontal da página). Body empilha verticalmente
+     (ícone em cima, valor embaixo) para caber em ~160px de coluna. */
   .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .stat-card {
+    min-width: 0;
+    padding: 1rem;
+  }
+
+  .stat-card-body {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .stat-details { min-width: 0; }
+
+  .stat-value { font-size: 1.15rem; }
+
+  /* 5º card (saldo) ocupa a linha inteira — pares de 2 até aqui. */
+  .stat-card:last-child {
+    grid-column: 1 / -1;
   }
 
   .data-table,
