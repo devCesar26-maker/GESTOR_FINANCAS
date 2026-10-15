@@ -518,12 +518,13 @@ export default function Faturas() {
                       {f.status}
                     </span>
                   </td>
-                  {/* Ações compactas: .table-actions (flex wrap) substitui o
-                      antigo estilo inline (inline não pode ser sobrescrito por
-                      media queries). No desktop alinha à direita como antes;
-                      no modo card (< 768px) quebra linha sem estourar. */}
+                  {/* Ações compactas empilhadas: .table-actions--stack
+                      (flex em coluna) faz todos os botões usarem width: 100%
+                      do contêiner, deixando "Detalhes" com a mesma largura de
+                      "Pagar"/"Receber"/"Comprovante". Sem width fixa em px,
+                      funciona em desktop, tablet e mobile (modo card < 768px). */}
                   <td data-label="Ações" style={{ textAlign: 'right' }}>
-                    <div className="table-actions">
+                    <div className="table-actions table-actions--stack">
                       {f.tipo === 'a_receber' && (f.status === 'pendente' || f.status === 'vencida') && (
                         <BotaoCobrancaWhatsApp fatura={f} />
                       )}

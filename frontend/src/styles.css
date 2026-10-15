@@ -508,6 +508,19 @@ body {
   flex-wrap: wrap;
 }
 
+/* Ações empilhadas (tabela de Faturas): coluna em que todos os botões
+   ocupam a largura do contêiner (sem width fixa em px), para que
+   "Detalhes" fique com a MESMA largura de "Pagar"/"Receber"/
+   "Comprovante" na mesma célula, em qualquer breakpoint. */
+.table-actions--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+.table-actions--stack > * {
+  width: 100%;
+  justify-content: center;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
